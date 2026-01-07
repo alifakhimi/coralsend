@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  server:
+    build:
+      context: ../
+      dockerfile: deploy/Dockerfile.server
+    ports:
+      - "8080:8080"
+    restart: always
+
+  web:
+    build:
+      context: ../
+      dockerfile: deploy/Dockerfile.web
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_SIGNALING_URL=ws://localhost:8080/ws
+    depends_on:
+      - server
+    restart: always
+

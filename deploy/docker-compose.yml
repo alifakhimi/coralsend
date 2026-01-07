@@ -13,10 +13,12 @@ services:
       dockerfile: deploy/Dockerfile.web
       args:
         - NEXT_PUBLIC_SIGNALING_URL=${NEXT_PUBLIC_SIGNALING_URL:-ws://localhost:8080/ws}
+        - NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH:-}
     ports:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_SIGNALING_URL=${NEXT_PUBLIC_SIGNALING_URL:-ws://localhost:8080/ws}
+      - NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH:-}
     depends_on:
       - server
     restart: always

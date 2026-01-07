@@ -133,6 +133,8 @@ export const useWebRTC = () => {
   // Setup data channel event handlers
   const setupDataChannel = useCallback((channel: RTCDataChannel) => {
     channel.binaryType = 'arraybuffer';
+    // Set threshold for flow control (e.g., 64KB)
+    channel.bufferedAmountLowThreshold = 65536;
     
     channel.onopen = () => {
       console.log('Data channel open');
@@ -383,31 +385,37 @@ export const useWebRTC = () => {
           }
 
           const sendChunk = () => {
-            while (offset < buffer.byteLength) {
-              if (sendAbortController.current?.signal.aborted) {
-                reject(new Error('Transfer cancelled'));
-                return;
+            try {
+              while (offset < buffer.byteLength) {
+                if (sendAbortController.current?.signal.aborted) {
+                  reject(new Error('Transfer cancelled'));
+                  return;
+                }
+
+                // Flow control: Wait if buffer is getting full (1MB threshold)
+                if (dc.current!.bufferedAmount > 1024 * 1024) {
+                  dc.current!.onbufferedamountlow = () => {
+                    dc.current!.onbufferedamountlow = null;
+                    sendChunk();
+                  };
+                  return;
+                }
+
+                const end = Math.min(offset + CHUNK_SIZE, buffer.byteLength);
+                const chunk = buffer.slice(offset, end);
+                dc.current!.send(chunk);
+                offset = end;
+
+                // Update progress occasionally
+                if (offset % (CHUNK_SIZE * 20) === 0 || offset === buffer.byteLength) {
+                  const progress = Math.min(100, Math.round((offset / file.size) * 100));
+                  useStore.getState().updateFileProgress(fileId, progress);
+                }
               }
-
-              // Flow control
-              if (dc.current!.bufferedAmount > 16 * 1024 * 1024) {
-                dc.current!.onbufferedamountlow = () => {
-                  dc.current!.onbufferedamountlow = null;
-                  sendChunk();
-                };
-                return;
-              }
-
-              const end = Math.min(offset + CHUNK_SIZE, buffer.byteLength);
-              const chunk = buffer.slice(offset, end);
-              dc.current!.send(chunk);
-              offset = end;
-
-              const progress = Math.min(100, Math.round((offset / file.size) * 100));
-              useStore.getState().updateFileProgress(fileId, progress);
+              resolve();
+            } catch (err) {
+              reject(err);
             }
-
-            resolve();
           };
 
           sendChunk();

@@ -4,3 +4,4 @@
 .env
 .env.local
 .env.*.local
+apps/server/server

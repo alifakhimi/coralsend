@@ -9,6 +9,11 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY apps/web/ .
+
+# Allow build-time environment variables
+ARG NEXT_PUBLIC_SIGNALING_URL
+ENV NEXT_PUBLIC_SIGNALING_URL=${NEXT_PUBLIC_SIGNALING_URL}
+
 RUN npm run build
 
 FROM base AS runner

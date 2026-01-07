@@ -6,6 +6,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { useWebRTC } from '@/hooks/useWebRTC';
 import { useStore } from '@/store/store';
+import { getBaseUrl } from '@/lib/constants';
 import { Send, Download, Loader2, FileUp, CheckCircle, Copy, Link as LinkIcon, ClipboardPaste, AlertCircle, X } from 'lucide-react';
 
 export default function Home() {
@@ -85,7 +86,8 @@ export default function Home() {
   const copyLink = async () => {
     if (roomId) {
       try {
-        const link = `${window.location.origin}?room=${roomId}`;
+        const baseUrl = getBaseUrl();
+        const link = `${baseUrl}?room=${roomId}`;
         await navigator.clipboard.writeText(link);
         setCopySuccess(true);
         setTimeout(() => setCopySuccess(false), 2000);
@@ -183,7 +185,7 @@ export default function Home() {
             {status === 'connecting' && (
               <>
                 <div className="bg-white p-4 rounded-xl inline-block shadow-lg shadow-teal-500/20">
-                  {roomId && <QRCodeSVG value={`${typeof window !== 'undefined' ? window.location.origin : ''}?room=${roomId}`} size={200} />}
+                  {roomId && <QRCodeSVG value={`${getBaseUrl()}?room=${roomId}`} size={200} />}
                 </div>
 
                 <div className="flex flex-col gap-3">

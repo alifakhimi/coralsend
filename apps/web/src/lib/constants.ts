@@ -1,3 +1,11 @@
+// Get base URL (origin + pathname) dynamically
+export const getBaseUrl = (): string => {
+  if (typeof window !== 'undefined') {
+    return window.location.origin + window.location.pathname.replace(/\/$/, '');
+  }
+  return '';
+};
+
 // Get signaling server URL dynamically based on current location
 export const getSignalingServerUrl = (): string => {
   // Use environment variable if set (highest priority)

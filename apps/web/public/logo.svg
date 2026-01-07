@@ -1,0 +1,50 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle with gradient -->
+  <defs>
+    <linearGradient id="coralGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#14b8a6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#06b6d4;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="coralGradientDark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0d9488;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0891b2;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Main coral structure - branching network -->
+  <!-- Center node -->
+  <circle cx="100" cy="100" r="12" fill="url(#coralGradient)" />
+  
+  <!-- Branching arms (representing P2P network) -->
+  <!-- Top branches -->
+  <path d="M 100 100 L 70 50" stroke="url(#coralGradient)" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <circle cx="70" cy="50" r="8" fill="url(#coralGradientDark)" />
+  
+  <path d="M 100 100 L 100 40" stroke="url(#coralGradient)" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <circle cx="100" cy="40" r="8" fill="url(#coralGradientDark)" />
+  
+  <path d="M 100 100 L 130 50" stroke="url(#coralGradient)" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <circle cx="130" cy="50" r="8" fill="url(#coralGradientDark)" />
+  
+  <!-- Side branches -->
+  <path d="M 100 100 L 50 100" stroke="url(#coralGradient)" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <circle cx="50" cy="100" r="8" fill="url(#coralGradientDark)" />
+  
+  <path d="M 100 100 L 150 100" stroke="url(#coralGradient)" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <circle cx="150" cy="100" r="8" fill="url(#coralGradientDark)" />
+  
+  <!-- Bottom branches -->
+  <path d="M 100 100 L 70 150" stroke="url(#coralGradient)" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <circle cx="70" cy="150" r="8" fill="url(#coralGradientDark)" />
+  
+  <path d="M 100 100 L 100 160" stroke="url(#coralGradient)" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <circle cx="100" cy="160" r="8" fill="url(#coralGradientDark)" />
+  
+  <path d="M 100 100 L 130 150" stroke="url(#coralGradient)" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <circle cx="130" cy="150" r="8" fill="url(#coralGradientDark)" />
+  
+  <!-- Connection lines between nodes (network mesh) -->
+  <path d="M 70 50 L 100 40 L 130 50" stroke="url(#coralGradientDark)" stroke-width="1.5" fill="none" opacity="0.4" stroke-linecap="round"/>
+  <path d="M 50 100 L 70 150 L 100 160 L 130 150 L 150 100" stroke="url(#coralGradientDark)" stroke-width="1.5" fill="none" opacity="0.4" stroke-linecap="round"/>
+</svg>
+

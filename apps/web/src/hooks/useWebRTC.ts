@@ -245,6 +245,17 @@ export const useWebRTC = () => {
       }
     };
 
+    pc.oniceconnectionstatechange = () => {
+      const state = pc.iceConnectionState;
+      console.log('ICE connection state with', remoteDeviceId, ':', state);
+
+      if (state === 'connected' || state === 'completed') {
+        useStore.getState().updateMemberStatus(remoteDeviceId, 'online');
+      } else if (state === 'disconnected' || state === 'failed' || state === 'closed') {
+        useStore.getState().updateMemberStatus(remoteDeviceId, 'offline');
+      }
+    };
+
     pc.onconnectionstatechange = () => {
       const state = pc.connectionState;
       console.log('Connection state with', remoteDeviceId, ':', state);
@@ -285,7 +296,7 @@ export const useWebRTC = () => {
         case 'member-list': {
           // Update member list from server
           const members = msg.payload as MemberPayload[];
-          members.forEach((m) => {
+          for (const m of members) {
             if (m.deviceId !== myDeviceId) {
               store.addMember({
                 deviceId: m.deviceId,
@@ -293,8 +304,34 @@ export const useWebRTC = () => {
                 joinedAt: m.joinedAt,
                 status: 'connecting' as const,
               });
+
+              // Set timeout to check connection status
+              setTimeout(() => {
+                const currentMember = useStore.getState().currentRoom?.members.find(member => member.deviceId === m.deviceId);
+                if (currentMember && currentMember.status === 'connecting') {
+                  console.warn('Connection timeout for', m.displayName, '- marking as offline');
+                  useStore.getState().updateMemberStatus(m.deviceId, 'offline');
+                }
+              }, 30000); // 30 seconds timeout
+
+              // Initiate connection with existing members (higher deviceId initiates)
+              if (myDeviceId > m.deviceId) {
+                console.log('Initiating connection with existing member', m.displayName, '(I am initiator)');
+                const pc = createPeerConnection(m.deviceId, true);
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                
+                ws.current?.send(JSON.stringify({
+                  type: 'offer',
+                  roomId,
+                  targetId: m.deviceId,
+                  payload: offer,
+                }));
+              } else {
+                console.log('Waiting for offer from existing member', m.displayName, '(they are initiator)');
+              }
             }
-          });
+          }
           store.setStatus('connected');
           break;
         }
@@ -310,8 +347,19 @@ export const useWebRTC = () => {
               status: 'connecting' as const,
             });
 
+            // Set timeout to check connection status
+            setTimeout(() => {
+              const currentMember = useStore.getState().currentRoom?.members.find(m => m.deviceId === member.deviceId);
+              if (currentMember && currentMember.status === 'connecting') {
+                console.warn('Connection timeout for', member.displayName, '- retrying...');
+                // Mark as offline after timeout
+                useStore.getState().updateMemberStatus(member.deviceId, 'offline');
+              }
+            }, 30000); // 30 seconds timeout
+
             // Initiate connection (higher deviceId initiates)
             if (myDeviceId > member.deviceId) {
+              console.log('Initiating connection with', member.displayName, '(I am initiator)');
               const pc = createPeerConnection(member.deviceId, true);
               const offer = await pc.createOffer();
               await pc.setLocalDescription(offer);
@@ -322,6 +370,8 @@ export const useWebRTC = () => {
                 targetId: member.deviceId,
                 payload: offer,
               }));
+            } else {
+              console.log('Waiting for offer from', member.displayName, '(they are initiator)');
             }
           }
           break;

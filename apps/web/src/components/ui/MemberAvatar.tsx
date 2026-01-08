@@ -31,9 +31,9 @@ export function MemberAvatar({ member, size = 'md', showStatus = true, className
     <div className={cn('relative inline-flex', className)}>
       <div
         className={cn(
-          'rounded-full flex items-center justify-center font-bold text-white shadow-md',
+          'rounded-full flex items-center justify-center font-bold text-white',
           sizes[size],
-          member.isMe && 'ring-2 ring-teal-400 ring-offset-2 ring-offset-slate-900'
+          member.isMe && 'ring-2 ring-teal-400'
         )}
         style={{ backgroundColor: bgColor }}
         title={member.displayName}

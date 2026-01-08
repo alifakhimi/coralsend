@@ -94,7 +94,7 @@ interface AppState {
   updateMemberStatus: (deviceId: string, status: Member['status']) => void;
   
   // Actions - Files
-  addFile: (file: Omit<FileMetadata, 'id' | 'progress' | 'status'>) => string;
+  addFile: (file: Omit<FileMetadata, 'id' | 'progress' | 'status'>, id?: string) => string;
   updateFileProgress: (fileId: string, progress: number) => void;
   updateFileStatus: (fileId: string, status: FileMetadata['status']) => void;
   removeFile: (fileId: string) => void;
@@ -265,11 +265,11 @@ export const useStore = create<AppState>()(
       },
 
       // Files - Add
-      addFile: (file) => {
+      addFile: (file, providedId) => {
         const { currentRoom } = get();
         if (!currentRoom) return '';
         
-        const id = generateId();
+        const id = providedId || generateId();
         const newFile: FileMetadata = {
           id,
           name: file.name,

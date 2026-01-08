@@ -160,8 +160,24 @@ export const useWebRTC = () => {
           const meta = msg.payload as FileMetadataPayload;
           console.log('Receiving file from', senderDeviceId, ':', meta.name);
           
+          // Ensure file exists in store (in case file-meta was missed)
+          const existingFile = store.currentRoom?.files.find(f => f.id === meta.id);
+          if (!existingFile) {
+            store.addFile({
+              name: meta.name,
+              size: meta.size,
+              type: meta.type,
+              uploaderId: meta.uploaderId,
+              uploaderName: meta.uploaderName,
+              uploadedAt: meta.uploadedAt,
+              direction: 'inbox',
+              thumbnailUrl: meta.thumbnailUrl,
+            }, meta.id);
+          }
+          
           incomingChunks.current.set(meta.id, { meta, chunks: [] });
           store.updateFileStatus(meta.id, 'downloading');
+          store.updateFileProgress(meta.id, 0);
           
         } else if (msg.type === 'file-end') {
           // File transfer complete
@@ -183,10 +199,10 @@ export const useWebRTC = () => {
 
     // Binary data (file chunks) with fileId prefix
     if (data instanceof ArrayBuffer) {
-      // First 36 bytes are fileId (UUID)
+      // First 36 bytes are fileId (padded to 36 chars)
       const decoder = new TextDecoder();
       const fileIdBytes = data.slice(0, 36);
-      const fileId = decoder.decode(fileIdBytes);
+      const fileId = decoder.decode(fileIdBytes).trim();
       const chunk = data.slice(36);
       
       const incoming = incomingChunks.current.get(fileId);
@@ -195,6 +211,8 @@ export const useWebRTC = () => {
         const received = incoming.chunks.reduce((acc, c) => acc + c.byteLength, 0);
         const progress = Math.min(100, Math.round((received / incoming.meta.size) * 100));
         store.updateFileProgress(fileId, progress);
+      } else {
+        console.warn('Received chunk for unknown fileId:', fileId);
       }
     }
   }, [downloadFile]);
@@ -447,7 +465,7 @@ export const useWebRTC = () => {
               uploadedAt: meta.uploadedAt,
               direction: 'inbox',
               thumbnailUrl: meta.thumbnailUrl,
-            });
+            }, meta.id);
           }
           break;
         }
@@ -555,7 +573,7 @@ export const useWebRTC = () => {
     // Generate thumbnail for images
     const thumbnailUrl = await generateThumbnail(file);
 
-    // Add to outbox
+    // Add to outbox with the same fileId
     store.addFile({
       name: file.name,
       size: file.size,
@@ -565,7 +583,7 @@ export const useWebRTC = () => {
       uploadedAt,
       direction: 'outbox',
       thumbnailUrl,
-    });
+    }, fileId);
 
     // Broadcast metadata to all peers via signaling server
     const meta: FileMetadataPayload = {

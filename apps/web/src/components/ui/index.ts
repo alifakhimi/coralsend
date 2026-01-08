@@ -5,4 +5,9 @@ export { Progress } from './Progress';
 export { FileCard } from './FileCard';
 export { ConnectionStatus } from './ConnectionStatus';
 export { QRScanner } from './QRScanner';
-
+export { MemberAvatar } from './MemberAvatar';
+export { MemberList, MemberAvatarStack } from './MemberList';
+export { FileList } from './FileList';
+export { RoomHistory } from './RoomHistory';
+export { Chat } from './Chat';
+export { RoomSettings } from './RoomSettings';

@@ -1,103 +1,178 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { useStore, FileTransfer } from '@/store/store';
+import { useStore, type Member, type FileMetadata, type ChatMessage } from '@/store/store';
 import { getSignalingServerUrl, ICE_SERVERS } from '@/lib/constants';
+import { getDeviceId, getShortName } from '@/lib/deviceId';
+
+// ============ Types ============
 
 type SignalMessage = {
-  type: 'join' | 'offer' | 'answer' | 'candidate' | 'peer-joined' | 'peer-left';
+  type: string;
   roomId: string;
+  deviceId?: string;
+  targetId?: string;
   payload?: unknown;
 };
 
-type FileMetadata = {
-  type: 'file-meta';
-  fileId: string;
+type FileMetadataPayload = {
+  id: string;
   name: string;
   size: number;
-  mime: string;
+  type: string;
+  uploaderId: string;
+  uploaderName: string;
+  uploadedAt: number;
+  thumbnailUrl?: string;
 };
 
-type TransferMessage = {
-  type: 'transfer-start' | 'transfer-complete' | 'transfer-cancel';
-  fileId: string;
+type MemberPayload = {
+  deviceId: string;
+  displayName: string;
+  joinedAt: number;
+  status: string;
 };
+
+type ChatMessagePayload = {
+  text: string;
+  senderId: string;
+  senderName: string;
+  timestamp: number;
+};
+
+// ============ Constants ============
 
 const CHUNK_SIZE = 16 * 1024; // 16KB chunks
+const BUFFER_LOW_THRESHOLD = 65536; // 64KB
+const BUFFER_HIGH_THRESHOLD = 1024 * 1024; // 1MB
+const THUMBNAIL_MAX_SIZE = 200; // Max thumbnail dimension
+
+// ============ Helpers ============
+
+/**
+ * Generate a thumbnail for an image file
+ */
+async function generateThumbnail(file: File): Promise<string | undefined> {
+  if (!file.type.startsWith('image/')) return undefined;
+  
+  try {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new window.Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          
+          // Scale down to max thumbnail size
+          if (width > height) {
+            if (width > THUMBNAIL_MAX_SIZE) {
+              height = Math.round((height * THUMBNAIL_MAX_SIZE) / width);
+              width = THUMBNAIL_MAX_SIZE;
+            }
+          } else {
+            if (height > THUMBNAIL_MAX_SIZE) {
+              width = Math.round((width * THUMBNAIL_MAX_SIZE) / height);
+              height = THUMBNAIL_MAX_SIZE;
+            }
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          
+          resolve(canvas.toDataURL('image/jpeg', 0.7));
+        };
+        img.onerror = () => resolve(undefined);
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => resolve(undefined);
+      reader.readAsDataURL(file);
+    });
+  } catch {
+    return undefined;
+  }
+}
+
+// ============ Hook ============
 
 export const useWebRTC = () => {
   const ws = useRef<WebSocket | null>(null);
-  const pc = useRef<RTCPeerConnection | null>(null);
-  const dc = useRef<RTCDataChannel | null>(null);
+  
+  // Multi-peer connections: deviceId -> RTCPeerConnection
+  const peers = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const dataChannels = useRef<Map<string, RTCDataChannel>>(new Map());
+  
+  // File transfer state
+  const pendingFiles = useRef<Map<string, File>>(new Map()); // fileId -> File
+  const incomingChunks = useRef<Map<string, { meta: FileMetadataPayload; chunks: ArrayBuffer[] }>>(new Map());
   const sendAbortController = useRef<AbortController | null>(null);
 
-  // File receiver state
-  const incomingFile = useRef<{
-    meta: FileMetadata;
-    receivedSize: number;
-    chunks: ArrayBuffer[];
-    storeId: string;
-  } | null>(null);
+  // ============ Cleanup ============
 
   const cleanup = useCallback(() => {
     sendAbortController.current?.abort();
-    dc.current?.close();
-    pc.current?.close();
+    
+    // Close all data channels
+    dataChannels.current.forEach((dc) => dc.close());
+    dataChannels.current.clear();
+    
+    // Close all peer connections
+    peers.current.forEach((pc) => pc.close());
+    peers.current.clear();
+    
+    // Close WebSocket
     ws.current?.close();
-    
-    dc.current = null;
-    pc.current = null;
     ws.current = null;
-    incomingFile.current = null;
     
-    useStore.getState().setStatus('idle');
+    incomingChunks.current.clear();
+    pendingFiles.current.clear();
+    
+    useStore.getState().reset();
   }, []);
 
-  // Download completed file
-  const downloadFile = useCallback((fileData: { meta: FileMetadata; chunks: ArrayBuffer[] }) => {
-    const blob = new Blob(fileData.chunks, { type: fileData.meta.mime });
+  // ============ File Download ============
+
+  const downloadFile = useCallback((meta: FileMetadataPayload, chunks: ArrayBuffer[]) => {
+    const blob = new Blob(chunks, { type: meta.type });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = fileData.meta.name;
+    a.download = meta.name;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }, []);
 
-  // Handle incoming data channel messages
-  const handleDataMessage = useCallback((data: unknown) => {
+  // ============ Data Channel Handling ============
+
+  const handleDataMessage = useCallback((senderDeviceId: string, data: unknown) => {
     const store = useStore.getState();
-    
-    // String messages (metadata, control)
+
+    // String messages (control messages)
     if (typeof data === 'string') {
       try {
         const msg = JSON.parse(data);
         
-        if (msg.type === 'file-meta') {
-          console.log('Receiving file:', msg.name);
-          const fileId = store.addFile({
-            name: msg.name,
-            size: msg.size,
-            type: msg.mime,
-            direction: 'receive',
-          });
+        if (msg.type === 'file-start') {
+          // Receiving file data start
+          const meta = msg.payload as FileMetadataPayload;
+          console.log('Receiving file from', senderDeviceId, ':', meta.name);
           
-          incomingFile.current = {
-            meta: msg,
-            receivedSize: 0,
-            chunks: [],
-            storeId: fileId,
-          };
+          incomingChunks.current.set(meta.id, { meta, chunks: [] });
+          store.updateFileStatus(meta.id, 'downloading');
           
-          store.setCurrentFile(fileId);
-          store.updateFileStatus(fileId, 'transferring');
-          store.setStatus('transferring');
-        } else if (msg.type === 'transfer-complete') {
-          console.log('Transfer complete signal received');
-        } else if (msg.type === 'transfer-cancel') {
-          if (incomingFile.current) {
-            store.updateFileStatus(incomingFile.current.storeId, 'error');
-            incomingFile.current = null;
+        } else if (msg.type === 'file-end') {
+          // File transfer complete
+          const fileId = msg.fileId;
+          const incoming = incomingChunks.current.get(fileId);
+          
+          if (incoming) {
+            console.log('File transfer complete:', incoming.meta.name);
+            store.updateFileStatus(fileId, 'completed');
+            downloadFile(incoming.meta, incoming.chunks);
+            incomingChunks.current.delete(fileId);
           }
         }
       } catch (e) {
@@ -106,190 +181,273 @@ export const useWebRTC = () => {
       return;
     }
 
-    // Binary data (file chunks)
-    if (incomingFile.current && data instanceof ArrayBuffer) {
-      const chunk = data;
-      incomingFile.current.chunks.push(chunk);
-      incomingFile.current.receivedSize += chunk.byteLength;
-
-      const progress = Math.min(
-        100,
-        Math.round((incomingFile.current.receivedSize / incomingFile.current.meta.size) * 100)
-      );
+    // Binary data (file chunks) with fileId prefix
+    if (data instanceof ArrayBuffer) {
+      // First 36 bytes are fileId (UUID)
+      const decoder = new TextDecoder();
+      const fileIdBytes = data.slice(0, 36);
+      const fileId = decoder.decode(fileIdBytes);
+      const chunk = data.slice(36);
       
-      store.updateFileProgress(incomingFile.current.storeId, progress);
-
-      // Check if transfer complete
-      if (incomingFile.current.receivedSize >= incomingFile.current.meta.size) {
-        console.log('File transfer complete');
-        store.updateFileStatus(incomingFile.current.storeId, 'completed');
-        store.setStatus('connected');
-        downloadFile(incomingFile.current);
-        incomingFile.current = null;
+      const incoming = incomingChunks.current.get(fileId);
+      if (incoming) {
+        incoming.chunks.push(chunk);
+        const received = incoming.chunks.reduce((acc, c) => acc + c.byteLength, 0);
+        const progress = Math.min(100, Math.round((received / incoming.meta.size) * 100));
+        store.updateFileProgress(fileId, progress);
       }
     }
   }, [downloadFile]);
 
-  // Setup data channel event handlers
-  const setupDataChannel = useCallback((channel: RTCDataChannel) => {
+  const setupDataChannel = useCallback((channel: RTCDataChannel, remoteDeviceId: string) => {
     channel.binaryType = 'arraybuffer';
-    // Set threshold for flow control (e.g., 64KB)
-    channel.bufferedAmountLowThreshold = 65536;
-    
+    channel.bufferedAmountLowThreshold = BUFFER_LOW_THRESHOLD;
+
     channel.onopen = () => {
-      console.log('Data channel open');
-      useStore.getState().setStatus('connected');
+      console.log('Data channel open with', remoteDeviceId);
+      useStore.getState().updateMemberStatus(remoteDeviceId, 'online');
     };
-    
+
     channel.onclose = () => {
-      console.log('Data channel closed');
+      console.log('Data channel closed with', remoteDeviceId);
+      useStore.getState().updateMemberStatus(remoteDeviceId, 'offline');
     };
-    
+
     channel.onerror = (error) => {
-      console.error('Data channel error:', error);
+      console.error('Data channel error with', remoteDeviceId, ':', error);
     };
-    
-    channel.onmessage = (event) => handleDataMessage(event.data);
+
+    channel.onmessage = (event) => handleDataMessage(remoteDeviceId, event.data);
+
+    dataChannels.current.set(remoteDeviceId, channel);
   }, [handleDataMessage]);
 
-  // Send WebRTC offer
-  const sendOffer = useCallback(async () => {
-    if (!pc.current || !ws.current || ws.current.readyState !== WebSocket.OPEN) {
-      console.error('Cannot send offer: connection not ready');
-      return;
+  // ============ Peer Connection ============
+
+  const createPeerConnection = useCallback((remoteDeviceId: string, isInitiator: boolean) => {
+    if (peers.current.has(remoteDeviceId)) {
+      return peers.current.get(remoteDeviceId)!;
     }
 
-    // Create data channel for file transfer
-    dc.current = pc.current.createDataChannel('coral-transfer', { ordered: true });
-    setupDataChannel(dc.current);
+    console.log('Creating peer connection with', remoteDeviceId, isInitiator ? '(initiator)' : '(receiver)');
+    
+    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    peers.current.set(remoteDeviceId, pc);
 
-    try {
-      const offer = await pc.current.createOffer();
-      await pc.current.setLocalDescription(offer);
-      console.log('Sending offer');
-      
-      ws.current.send(JSON.stringify({
-        type: 'offer',
-        roomId: useStore.getState().roomId,
-        payload: offer,
-      }));
-    } catch (err) {
-      console.error('Failed to create offer:', err);
-      useStore.getState().setError('Failed to create connection offer');
-    }
-  }, [setupDataChannel]);
-
-  // Handle signaling messages
-  const handleSignalMessage = useCallback(async (msg: SignalMessage) => {
-    const store = useStore.getState();
-    const currentRole = store.role;
-    const currentStatus = store.status;
-
-    try {
-      switch (msg.type) {
-        case 'peer-joined':
-          console.log('Peer joined the room');
-          store.setPeer({ id: msg.payload as string || 'peer', joinedAt: Date.now() });
-          
-          if (currentRole === 'sender' && (currentStatus === 'waiting-peer' || currentStatus === 'connecting')) {
-            store.setStatus('peer-joined');
-            setTimeout(() => sendOffer(), 100);
-          } else if (currentRole === 'receiver') {
-            console.log('Receiver: waiting for offer from sender');
-          }
-          break;
-
-        case 'peer-left':
-          console.log('Peer left the room');
-          store.setPeer(null);
-          if (store.status === 'connected') {
-            store.setStatus('disconnected');
-          }
-          break;
-
-        case 'offer':
-          if (currentRole === 'receiver' && pc.current) {
-            console.log('Received offer');
-            await pc.current.setRemoteDescription(new RTCSessionDescription(msg.payload as RTCSessionDescriptionInit));
-            const answer = await pc.current.createAnswer();
-            await pc.current.setLocalDescription(answer);
-            console.log('Sending answer');
-            
-            ws.current?.send(JSON.stringify({
-              type: 'answer',
-              roomId: msg.roomId,
-              payload: answer,
-            }));
-          }
-          break;
-
-        case 'answer':
-          if (currentRole === 'sender' && pc.current) {
-            console.log('Received answer');
-            await pc.current.setRemoteDescription(new RTCSessionDescription(msg.payload as RTCSessionDescriptionInit));
-          }
-          break;
-
-        case 'candidate':
-          if (msg.payload && pc.current) {
-            console.log('Adding ICE candidate');
-            await pc.current.addIceCandidate(new RTCIceCandidate(msg.payload as RTCIceCandidateInit));
-          }
-          break;
-      }
-    } catch (err) {
-      console.error('Signaling error:', err);
-      store.setError('Failed to establish P2P connection');
-    }
-  }, [sendOffer]);
-
-  // Initialize peer connection
-  const initializePeerConnection = useCallback(() => {
-    pc.current = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-
-    pc.current.onicecandidate = (event) => {
+    pc.onicecandidate = (event) => {
       if (event.candidate && ws.current?.readyState === WebSocket.OPEN) {
         ws.current.send(JSON.stringify({
           type: 'candidate',
-          roomId: useStore.getState().roomId,
+          roomId: useStore.getState().currentRoom?.id,
+          targetId: remoteDeviceId,
           payload: event.candidate,
         }));
       }
     };
 
-    pc.current.onconnectionstatechange = () => {
-      const state = pc.current?.connectionState;
-      console.log('Connection state:', state);
-      
-      const store = useStore.getState();
-      
+    pc.onconnectionstatechange = () => {
+      const state = pc.connectionState;
+      console.log('Connection state with', remoteDeviceId, ':', state);
+
       if (state === 'connected') {
-        store.setStatus('connected');
-      } else if (state === 'failed') {
-        store.setError('P2P connection failed');
-        store.setStatus('error');
-      } else if (state === 'disconnected' || state === 'closed') {
-        if (store.status === 'connected' || store.status === 'transferring') {
-          store.setStatus('disconnected');
-        }
+        useStore.getState().updateMemberStatus(remoteDeviceId, 'online');
+      } else if (state === 'disconnected' || state === 'failed' || state === 'closed') {
+        useStore.getState().updateMemberStatus(remoteDeviceId, 'offline');
       }
     };
 
-    // Handle incoming data channel (for receiver)
-    pc.current.ondatachannel = (event) => {
-      console.log('Received data channel');
-      dc.current = event.channel;
-      setupDataChannel(dc.current);
+    // Handle incoming data channel (for non-initiator)
+    pc.ondatachannel = (event) => {
+      console.log('Received data channel from', remoteDeviceId);
+      setupDataChannel(event.channel, remoteDeviceId);
     };
+
+    // If initiator, create data channel
+    if (isInitiator) {
+      const dc = pc.createDataChannel('coral-transfer', { ordered: true });
+      setupDataChannel(dc, remoteDeviceId);
+    }
+
+    return pc;
   }, [setupDataChannel]);
 
-  // Connect to signaling server and join room
-  const connect = useCallback((newRoomId: string, userRole: 'sender' | 'receiver') => {
+  // ============ Signaling ============
+
+  const handleSignalMessage = useCallback(async (msg: SignalMessage) => {
     const store = useStore.getState();
-    store.setRoomId(newRoomId);
-    store.setRole(userRole);
+    const myDeviceId = store.deviceId;
+    const roomId = store.currentRoom?.id;
+
+    if (!roomId || !myDeviceId) return;
+
+    try {
+      switch (msg.type) {
+        case 'member-list': {
+          // Update member list from server
+          const members = msg.payload as MemberPayload[];
+          members.forEach((m) => {
+            if (m.deviceId !== myDeviceId) {
+              store.addMember({
+                deviceId: m.deviceId,
+                displayName: m.displayName,
+                joinedAt: m.joinedAt,
+                status: 'connecting' as const,
+              });
+            }
+          });
+          store.setStatus('connected');
+          break;
+        }
+
+        case 'member-joined': {
+          const member = msg.payload as MemberPayload;
+          if (member.deviceId !== myDeviceId) {
+            console.log('Member joined:', member.displayName);
+            store.addMember({
+              deviceId: member.deviceId,
+              displayName: member.displayName,
+              joinedAt: member.joinedAt,
+              status: 'connecting' as const,
+            });
+
+            // Initiate connection (higher deviceId initiates)
+            if (myDeviceId > member.deviceId) {
+              const pc = createPeerConnection(member.deviceId, true);
+              const offer = await pc.createOffer();
+              await pc.setLocalDescription(offer);
+              
+              ws.current?.send(JSON.stringify({
+                type: 'offer',
+                roomId,
+                targetId: member.deviceId,
+                payload: offer,
+              }));
+            }
+          }
+          break;
+        }
+
+        case 'member-left': {
+          const member = msg.payload as MemberPayload;
+          console.log('Member left:', member.displayName);
+          
+          // Clean up peer connection
+          const pc = peers.current.get(member.deviceId);
+          if (pc) {
+            pc.close();
+            peers.current.delete(member.deviceId);
+          }
+          dataChannels.current.delete(member.deviceId);
+          
+          store.removeMember(member.deviceId);
+          break;
+        }
+
+        case 'offer': {
+          const senderDeviceId = msg.deviceId!;
+          if (senderDeviceId === myDeviceId) return;
+          
+          console.log('Received offer from', senderDeviceId);
+          const pc = createPeerConnection(senderDeviceId, false);
+          
+          await pc.setRemoteDescription(new RTCSessionDescription(msg.payload as RTCSessionDescriptionInit));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          
+          ws.current?.send(JSON.stringify({
+            type: 'answer',
+            roomId,
+            targetId: senderDeviceId,
+            payload: answer,
+          }));
+          break;
+        }
+
+        case 'answer': {
+          const senderDeviceId = msg.deviceId!;
+          console.log('Received answer from', senderDeviceId);
+          
+          const pc = peers.current.get(senderDeviceId);
+          if (pc) {
+            await pc.setRemoteDescription(new RTCSessionDescription(msg.payload as RTCSessionDescriptionInit));
+          }
+          break;
+        }
+
+        case 'candidate': {
+          const senderDeviceId = msg.deviceId!;
+          const pc = peers.current.get(senderDeviceId);
+          if (pc && msg.payload) {
+            await pc.addIceCandidate(new RTCIceCandidate(msg.payload as RTCIceCandidateInit));
+          }
+          break;
+        }
+
+        case 'file-meta': {
+          // Received file metadata from another member
+          const meta = msg.payload as FileMetadataPayload;
+          if (meta.uploaderId !== myDeviceId) {
+            console.log('File available:', meta.name, 'from', meta.uploaderName, meta.thumbnailUrl ? '(with thumbnail)' : '');
+            store.addFile({
+              name: meta.name,
+              size: meta.size,
+              type: meta.type,
+              uploaderId: meta.uploaderId,
+              uploaderName: meta.uploaderName,
+              uploadedAt: meta.uploadedAt,
+              direction: 'inbox',
+              thumbnailUrl: meta.thumbnailUrl,
+            });
+          }
+          break;
+        }
+
+        case 'file-request': {
+          // Someone wants to download a file I shared
+          const { fileId, requesterId } = msg.payload as { fileId: string; requesterId: string };
+          const file = pendingFiles.current.get(fileId);
+          if (file) {
+            sendFileToOne(file, fileId, requesterId);
+          }
+          break;
+        }
+
+        case 'chat': {
+          // Received chat message
+          const chatMsg = msg.payload as ChatMessagePayload;
+          if (chatMsg.senderId !== myDeviceId) {
+            store.addMessage({
+              text: chatMsg.text,
+              senderId: chatMsg.senderId,
+              senderName: chatMsg.senderName,
+              timestamp: chatMsg.timestamp,
+              isMe: false,
+            });
+          }
+          break;
+        }
+      }
+    } catch (err) {
+      console.error('Signal handling error:', err);
+    }
+  }, [createPeerConnection]);
+
+  // ============ Connection ============
+
+  const connect = useCallback((roomId: string, isCreator: boolean) => {
+    const deviceId = getDeviceId();
+    const displayName = getShortName(deviceId);
+    
+    const store = useStore.getState();
+    store.setDeviceId(deviceId);
     store.setStatus('connecting');
     store.setError(null);
+
+    if (isCreator) {
+      store.createRoom(roomId, deviceId, displayName);
+    } else {
+      store.joinRoom(roomId, deviceId, displayName);
+    }
 
     const wsUrl = getSignalingServerUrl();
     console.log('Connecting to signaling server:', wsUrl);
@@ -298,22 +456,18 @@ export const useWebRTC = () => {
 
     ws.current.onopen = () => {
       console.log('WebSocket connected');
-      ws.current?.send(JSON.stringify({ type: 'join', roomId: newRoomId }));
       
-      initializePeerConnection();
-      
-      if (userRole === 'sender') {
-        useStore.getState().setStatus('waiting-peer');
-        console.log('Sender: waiting for peer to join');
-      } else {
-        console.log('Receiver: waiting for offer');
-      }
+      const joinPayload = { deviceId, displayName };
+      ws.current?.send(JSON.stringify({
+        type: 'join',
+        roomId,
+        payload: joinPayload,
+      }));
     };
 
     ws.current.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
-        console.log('Signaling message:', msg.type);
         handleSignalMessage(msg);
       } catch (err) {
         console.error('Failed to parse message:', err);
@@ -328,149 +482,213 @@ export const useWebRTC = () => {
 
     ws.current.onclose = (event) => {
       console.log('WebSocket closed:', event.code);
-      if (event.code !== 1000) {
-        const currentStatus = useStore.getState().status;
-        if (currentStatus === 'connecting' || currentStatus === 'waiting-peer') {
-          store.setError('Connection closed unexpectedly');
-          store.setStatus('error');
-        }
+      if (event.code !== 1000 && store.status !== 'idle') {
+        store.setStatus('disconnected');
       }
     };
-  }, [initializePeerConnection, handleSignalMessage]);
+  }, [handleSignalMessage]);
 
-  // Send file to peer
-  const sendFile = useCallback(async (file: File) => {
-    if (!dc.current || dc.current.readyState !== 'open') {
-      console.error('Data channel not ready');
+  // ============ File Sharing ============
+
+  const shareFile = useCallback(async (file: File) => {
+    const store = useStore.getState();
+    const room = store.currentRoom;
+    if (!room || !store.deviceId) return;
+
+    const fileId = Math.random().toString(36).substring(2, 15);
+    const myName = getShortName(store.deviceId);
+    const uploadedAt = Date.now();
+
+    // Store file for later transfer requests
+    pendingFiles.current.set(fileId, file);
+
+    // Generate thumbnail for images
+    const thumbnailUrl = await generateThumbnail(file);
+
+    // Add to outbox
+    store.addFile({
+      name: file.name,
+      size: file.size,
+      type: file.type || 'application/octet-stream',
+      uploaderId: store.deviceId,
+      uploaderName: myName,
+      uploadedAt,
+      direction: 'outbox',
+      thumbnailUrl,
+    });
+
+    // Broadcast metadata to all peers via signaling server
+    const meta: FileMetadataPayload = {
+      id: fileId,
+      name: file.name,
+      size: file.size,
+      type: file.type || 'application/octet-stream',
+      uploaderId: store.deviceId,
+      uploaderName: myName,
+      uploadedAt,
+      thumbnailUrl,
+    };
+
+    ws.current?.send(JSON.stringify({
+      type: 'file-meta',
+      roomId: room.id,
+      payload: meta,
+    }));
+
+    console.log('File shared:', file.name, thumbnailUrl ? '(with thumbnail)' : '');
+  }, []);
+
+  // Request to download a file
+  const requestFile = useCallback((file: FileMetadata) => {
+    const store = useStore.getState();
+    const room = store.currentRoom;
+    if (!room || !store.deviceId) return;
+
+    console.log('Requesting file:', file.name, 'from', file.uploaderId);
+
+    // Send request via signaling server
+    ws.current?.send(JSON.stringify({
+      type: 'file-request',
+      roomId: room.id,
+      targetId: file.uploaderId,
+      payload: {
+        fileId: file.id,
+        requesterId: store.deviceId,
+      },
+    }));
+
+    store.updateFileStatus(file.id, 'downloading');
+    store.updateFileProgress(file.id, 0);
+  }, []);
+
+  // Send file to a specific peer
+  const sendFileToOne = useCallback(async (file: File, fileId: string, targetDeviceId: string) => {
+    const dc = dataChannels.current.get(targetDeviceId);
+    if (!dc || dc.readyState !== 'open') {
+      console.error('No data channel to', targetDeviceId);
       return;
     }
 
     const store = useStore.getState();
-    
-    // Add file to store
-    const fileId = store.addFile({
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      direction: 'send',
-    });
-    
-    store.setCurrentFile(fileId);
-    store.updateFileStatus(fileId, 'transferring');
-    store.setStatus('transferring');
-
-    // Create abort controller for this transfer
     sendAbortController.current = new AbortController();
 
     try {
-      // Send file metadata
-      const metadata: FileMetadata = {
-        type: 'file-meta',
-        fileId,
-        name: file.name,
-        size: file.size,
-        mime: file.type || 'application/octet-stream',
-      };
-      dc.current.send(JSON.stringify(metadata));
+      // Send start message
+      dc.send(JSON.stringify({
+        type: 'file-start',
+        payload: {
+          id: fileId,
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          uploaderId: store.deviceId,
+          uploaderName: getShortName(store.deviceId!),
+          uploadedAt: Date.now(),
+        },
+      }));
 
-      // Read file and send chunks
+      // Read and send chunks
       const buffer = await file.arrayBuffer();
       let offset = 0;
+      const encoder = new TextEncoder();
+      const fileIdBytes = encoder.encode(fileId.padEnd(36, ' '));
 
-      const sendNextChunk = (): Promise<void> => {
+      const sendChunk = (): Promise<void> => {
         return new Promise((resolve, reject) => {
-          if (sendAbortController.current?.signal.aborted) {
-            reject(new Error('Transfer cancelled'));
-            return;
-          }
-
-          const sendChunk = () => {
+          const send = () => {
             try {
               while (offset < buffer.byteLength) {
                 if (sendAbortController.current?.signal.aborted) {
-                  reject(new Error('Transfer cancelled'));
+                  reject(new Error('Cancelled'));
                   return;
                 }
 
-                // Flow control: Wait if buffer is getting full (1MB threshold)
-                if (dc.current!.bufferedAmount > 1024 * 1024) {
-                  dc.current!.onbufferedamountlow = () => {
-                    dc.current!.onbufferedamountlow = null;
-                    sendChunk();
+                if (dc.bufferedAmount > BUFFER_HIGH_THRESHOLD) {
+                  dc.onbufferedamountlow = () => {
+                    dc.onbufferedamountlow = null;
+                    send();
                   };
                   return;
                 }
 
                 const end = Math.min(offset + CHUNK_SIZE, buffer.byteLength);
                 const chunk = buffer.slice(offset, end);
-                dc.current!.send(chunk);
+                
+                // Prepend fileId to chunk
+                const combined = new Uint8Array(36 + chunk.byteLength);
+                combined.set(fileIdBytes, 0);
+                combined.set(new Uint8Array(chunk), 36);
+                
+                dc.send(combined.buffer);
                 offset = end;
-
-                // Update progress occasionally
-                if (offset % (CHUNK_SIZE * 20) === 0 || offset === buffer.byteLength) {
-                  const progress = Math.min(100, Math.round((offset / file.size) * 100));
-                  useStore.getState().updateFileProgress(fileId, progress);
-                }
               }
               resolve();
             } catch (err) {
               reject(err);
             }
           };
-
-          sendChunk();
+          send();
         });
       };
 
-      await sendNextChunk();
+      await sendChunk();
 
-      // Send completion message
-      dc.current.send(JSON.stringify({ type: 'transfer-complete', fileId }));
-      
-      store.updateFileStatus(fileId, 'completed');
-      store.setStatus('connected');
-      console.log('File sent successfully');
+      // Send end message
+      dc.send(JSON.stringify({ type: 'file-end', fileId }));
+      console.log('File sent to', targetDeviceId);
 
     } catch (err) {
       console.error('Send error:', err);
-      if ((err as Error).message !== 'Transfer cancelled') {
-        store.updateFileStatus(fileId, 'error');
-        store.setError('File transfer failed');
-      }
     } finally {
       sendAbortController.current = null;
     }
   }, []);
 
-  // Cancel current transfer
-  const cancelTransfer = useCallback(() => {
-    sendAbortController.current?.abort();
-    
+  // ============ Chat ============
+
+  const sendChat = useCallback((text: string) => {
     const store = useStore.getState();
-    if (store.currentFileId) {
-      store.updateFileStatus(store.currentFileId, 'error');
-    }
-    
-    // Notify peer
-    if (dc.current?.readyState === 'open') {
-      dc.current.send(JSON.stringify({ 
-        type: 'transfer-cancel', 
-        fileId: store.currentFileId 
-      }));
-    }
-    
-    store.setStatus('connected');
+    const room = store.currentRoom;
+    if (!room || !store.deviceId) return;
+
+    const myName = getShortName(store.deviceId);
+    const timestamp = Date.now();
+
+    // Add to local messages
+    store.addMessage({
+      text,
+      senderId: store.deviceId,
+      senderName: myName,
+      timestamp,
+      isMe: true,
+    });
+
+    // Broadcast to all peers via signaling server
+    ws.current?.send(JSON.stringify({
+      type: 'chat',
+      roomId: room.id,
+      payload: {
+        text,
+        senderId: store.deviceId,
+        senderName: myName,
+        timestamp,
+      },
+    }));
   }, []);
 
-  // Cleanup on unmount
+  // ============ Effects ============
+
   useEffect(() => {
     return () => cleanup();
   }, [cleanup]);
 
+  // ============ Return ============
+
   return {
     connect,
-    sendFile,
-    cancelTransfer,
+    shareFile,
+    requestFile,
+    sendChat,
     cleanup,
   };
 };

@@ -37,21 +37,28 @@ export function isValidUUID(str: string): boolean {
 
 // Extract room ID from URL or text
 export function extractRoomId(text: string): string | null {
+  const trimmed = text.trim();
+  
   // If it's a URL with room parameter
-  if (text.includes('room=')) {
+  if (trimmed.includes('room=')) {
     try {
-      const url = new URL(text);
+      const url = new URL(trimmed);
       return url.searchParams.get('room');
     } catch {
       // Try regex fallback
-      const match = text.match(/room=([a-f0-9-]+)/i);
-      return match ? match[1] : null;
+      const match = trimmed.match(/room=([A-Z0-9a-f-]+)/i);
+      return match ? match[1].toUpperCase() : null;
     }
   }
   
   // If it's a direct UUID
-  if (isValidUUID(text)) {
-    return text;
+  if (isValidUUID(trimmed)) {
+    return trimmed;
+  }
+  
+  // If it's a 6-character room code
+  if (/^[A-Za-z0-9]{6}$/.test(trimmed)) {
+    return trimmed.toUpperCase();
   }
   
   return null;

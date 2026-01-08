@@ -13,7 +13,7 @@ const (
 	writeWait      = 10 * time.Second
 	pongWait       = 60 * time.Second
 	pingPeriod     = (pongWait * 9) / 10
-	maxMessageSize = 512 * 1024 // 512KB for large SDPs
+	maxMessageSize = 1024 * 1024 // 1MB for file metadata
 )
 
 var upgrader = websocket.Upgrader{
@@ -23,6 +23,12 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		return true
 	},
+}
+
+// JoinPayload represents the data sent with a join message
+type JoinPayload struct {
+	DeviceID    string `json:"deviceId"`
+	DisplayName string `json:"displayName"`
 }
 
 // Client is a middleman between the websocket connection and the hub.
@@ -35,7 +41,10 @@ type Client struct {
 	// Buffered channel of outbound messages.
 	send chan *Message
 
-	RoomID string
+	RoomID      string
+	DeviceID    string
+	DisplayName string
+	JoinedAt    int64
 }
 
 // readPump pumps messages from the websocket connection to the hub.
@@ -62,16 +71,54 @@ func (c *Client) readPump() {
 			continue
 		}
 
-		// Security: Force RoomID to match client's initial room
-		// Or allow client to specify RoomID in "join" message and set it then.
-		// For simplicity MVP: Client sends "join" as first message.
-		
-		if msg.Type == "join" {
+		switch msg.Type {
+		case "join":
+			// Parse join payload
+			var joinPayload JoinPayload
+			if msg.Payload != nil {
+				json.Unmarshal(msg.Payload, &joinPayload)
+			}
+			
 			c.RoomID = msg.RoomID
+			c.DeviceID = joinPayload.DeviceID
+			c.DisplayName = joinPayload.DisplayName
+			c.JoinedAt = time.Now().UnixMilli()
+			
+			if c.DeviceID == "" {
+				c.DeviceID = msg.DeviceID
+			}
+			if c.DisplayName == "" {
+				c.DisplayName = c.DeviceID
+			}
+			
+			log.Printf("Join request: room=%s, device=%s, name=%s", c.RoomID, c.DeviceID, c.DisplayName)
 			c.Hub.register <- c
-		} else {
-			// Only relay if in the same room
+			
+		case "offer", "answer", "candidate":
+			// WebRTC signaling - relay to specific target or broadcast
 			if c.RoomID == msg.RoomID {
+				msg.DeviceID = c.DeviceID // Always set sender's device ID
+				c.Hub.broadcast <- &MessageWrapper{Client: c, Message: &msg}
+			}
+			
+		case "file-meta":
+			// File metadata broadcast - send to all room members
+			if c.RoomID == msg.RoomID {
+				msg.DeviceID = c.DeviceID
+				c.Hub.broadcast <- &MessageWrapper{Client: c, Message: &msg}
+			}
+			
+		case "file-request":
+			// Request to download a file - directed to file owner
+			if c.RoomID == msg.RoomID {
+				msg.DeviceID = c.DeviceID
+				c.Hub.broadcast <- &MessageWrapper{Client: c, Message: &msg}
+			}
+			
+		default:
+			// Relay other messages
+			if c.RoomID == msg.RoomID {
+				msg.DeviceID = c.DeviceID
 				c.Hub.broadcast <- &MessageWrapper{Client: c, Message: &msg}
 			}
 		}
@@ -120,12 +167,12 @@ func ServeWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
-	client := &Client{Hub: hub, conn: conn, send: make(chan *Message, 256)}
-	
-	// Allow client to register via first message
-	// client.Hub.register <- client // Moved to readPump on "join"
+	client := &Client{
+		Hub:  hub,
+		conn: conn,
+		send: make(chan *Message, 256),
+	}
 
 	go client.writePump()
 	go client.readPump()
 }
-

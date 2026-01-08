@@ -915,6 +915,39 @@ export const useWebRTC = () => {
     return () => cleanup();
   }, [cleanup]);
 
+  // Handle visibility change and periodic check for reconnection
+  useEffect(() => {
+    const checkConnection = () => {
+      if (document.visibilityState === 'visible') {
+        const store = useStore.getState();
+        const { currentRoom, status, deviceId } = store;
+
+        // If we are in a room but disconnected (or error), try to reconnect
+        if (currentRoom && deviceId && (status === 'disconnected' || status === 'error' || !ws.current || ws.current.readyState === WebSocket.CLOSED)) {
+          console.log('Reconnecting to room:', currentRoom.id);
+          connect(currentRoom.id, false);
+        }
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Immediate check when becoming visible
+        checkConnection();
+      }
+    };
+
+    // Check periodically (every 5 seconds)
+    const intervalId = setInterval(checkConnection, 5000);
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(intervalId);
+    };
+  }, [connect]);
+
   // ============ Retry Connection ============
   
   const retryConnection = useCallback((remoteDeviceId: string) => {

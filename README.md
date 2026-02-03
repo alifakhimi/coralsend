@@ -1,5 +1,15 @@
 # CoralSend 🪸
 
+> 🚧 **Development Status**
+>
+> CoralSend is currently under active development and should be considered **experimental**.
+>
+> This repository represents an MVP and is **not production-ready** yet.
+> APIs, security assumptions, and internal architecture may change without notice.
+>
+> **Do not use in production environments** until a stable release is explicitly announced.
+
+
 CoralSend is a **minimal, P2P-first file transfer** app built with a Next.js PWA frontend and a Go signaling server.
 
 It is designed around two goals:

@@ -39,13 +39,20 @@ export function isValidUUID(str: string): boolean {
 export function extractRoomId(text: string): string | null {
   const trimmed = text.trim();
   
-  // If it's a URL with room parameter
+  // If it contains /room/{id} path (from QR code or share link - full or relative URL)
+  const pathMatch = trimmed.match(/\/room\/([A-Z0-9a-f-]+)/i);
+  if (pathMatch) {
+    const id = pathMatch[1];
+    return isValidUUID(id) ? id : id.toUpperCase();
+  }
+  
+  // If it's a URL with room parameter (?room=...)
   if (trimmed.includes('room=')) {
     try {
       const url = new URL(trimmed);
-      return url.searchParams.get('room');
+      const room = url.searchParams.get('room');
+      return room ? (isValidUUID(room) ? room : room.toUpperCase()) : null;
     } catch {
-      // Try regex fallback
       const match = trimmed.match(/room=([A-Z0-9a-f-]+)/i);
       return match ? match[1].toUpperCase() : null;
     }

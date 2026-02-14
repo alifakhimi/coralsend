@@ -14,6 +14,10 @@ services:
       args:
         - NEXT_PUBLIC_SIGNALING_URL=${NEXT_PUBLIC_SIGNALING_URL:-ws://localhost:8080/ws}
         - NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH:-}
+        - NEXT_PUBLIC_STUN_URL=${NEXT_PUBLIC_STUN_URL:-}
+        - NEXT_PUBLIC_TURN_URL=${NEXT_PUBLIC_TURN_URL:-}
+        - NEXT_PUBLIC_TURN_USER=${NEXT_PUBLIC_TURN_USER:-}
+        - NEXT_PUBLIC_TURN_PASS=${NEXT_PUBLIC_TURN_PASS:-}
     ports:
       - "3000:3000"
     env_file:
@@ -21,6 +25,10 @@ services:
     environment:
       - NEXT_PUBLIC_SIGNALING_URL=${NEXT_PUBLIC_SIGNALING_URL:-ws://localhost:8080/ws}
       - NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH:-}
+      - NEXT_PUBLIC_STUN_URL=${NEXT_PUBLIC_STUN_URL:-}
+      - NEXT_PUBLIC_TURN_URL=${NEXT_PUBLIC_TURN_URL:-}
+      - NEXT_PUBLIC_TURN_USER=${NEXT_PUBLIC_TURN_USER:-}
+      - NEXT_PUBLIC_TURN_PASS=${NEXT_PUBLIC_TURN_PASS:-}
     depends_on:
       - server
     restart: always

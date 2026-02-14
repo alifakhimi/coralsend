@@ -148,7 +148,7 @@ The signaling server relays JSON messages shaped like:
 
 - **No E2EE layer** (beyond WebRTC’s transport encryption).
 - **No explicit “accept/reject connection” handshake** at the app layer (room link implies permission).
-- **No TURN server configured**. Some NAT/firewall setups may prevent P2P from connecting reliably.
+- **TURN is optional and must be configured correctly in production**. If TURN env vars are missing/invalid, some NAT/firewall setups may fail.
 - **No persistence**: if tabs close, transfers stop (by design for now).
 
 ## Development
@@ -225,6 +225,121 @@ Then open from your phone:
 
 The app will automatically compute the WebSocket URL for signaling using your current hostname (e.g. `ws://<your-laptop-ip>:8080/ws`).
 
+## Production installation on a VPS (Docker Compose)
+
+This section describes a complete self-hosted deployment with:
+- `web` (Next.js app)
+- `server` (Go signaling)
+- `nginx` (reverse proxy)
+- `coturn` (self-hosted STUN/TURN)
+
+### 1) Prerequisites on the server
+
+- Ubuntu/Debian VPS with a public IP
+- Docker + Docker Compose plugin installed
+- DNS records pointing to the VPS (recommended):
+  - `app.example.com` (web + ws through nginx)
+  - `turn.example.com` (TURN endpoint)
+- Open firewall ports:
+  - `80/tcp` (HTTP)
+  - `443/tcp` (HTTPS, when TLS is enabled)
+  - `3478/tcp` and `3478/udp` (TURN)
+  - `49160-49200/tcp` and `49160-49200/udp` (TURN relay range)
+
+### 2) Clone and configure environment
+
+```bash
+git clone https://github.com/<owner>/coralsend.git
+cd coralsend
+cp .env.example .env
+```
+
+Edit `.env`:
+
+- `NEXT_PUBLIC_SIGNALING_URL=wss://app.example.com/ws`
+- `NEXT_PUBLIC_BASE_PATH=` for root deployment, or `/coralsend` for subdirectory deployment
+- `NEXT_PUBLIC_STUN_URL=stun:turn.example.com:3478`
+- `NEXT_PUBLIC_TURN_URL=turn:turn.example.com:3478?transport=udp`
+- `NEXT_PUBLIC_TURN_USER` / `NEXT_PUBLIC_TURN_PASS`
+- `TURN_REALM=turn.example.com`
+- `TURN_USER` / `TURN_PASSWORD`
+- `TURN_EXTERNAL_IP=<your_vps_public_ip>`
+- `SERVER_IMAGE` and `WEB_IMAGE` (GHCR tags, if you deploy prebuilt images)
+
+### 3) Deploy using Docker Compose
+
+From repository root:
+
+```bash
+docker compose --env-file .env -f deploy/docker-compose.prod.yml up -d --build
+```
+
+If you want image-only deploy (no local build), set `SERVER_IMAGE` and `WEB_IMAGE` to existing GHCR tags and run:
+
+```bash
+docker compose --env-file .env -f deploy/docker-compose.prod.yml up -d
+```
+
+### 4) Validate services
+
+```bash
+docker compose -f deploy/docker-compose.prod.yml ps
+docker compose -f deploy/docker-compose.prod.yml logs -f server
+curl -fsS http://127.0.0.1:8080/health
+```
+
+Expected behavior:
+- `server` becomes healthy
+- `nginx` serves the app on port 80
+- WebSocket upgrade path `/ws` is proxied to `server:8080`
+- `coturn` listens on `3478` and relay ports
+
+### 5) TLS / WSS (required for real production)
+
+- Use a TLS terminator (nginx + certbot or your existing ingress)
+- Once TLS is enabled, keep:
+  - `NEXT_PUBLIC_SIGNALING_URL=wss://app.example.com/ws`
+  - TURN as `turn:...` or `turns:...` depending on your TLS strategy for TURN
+
+### 6) Subdirectory deployment notes (`NEXT_PUBLIC_BASE_PATH`)
+
+- If app is behind `/coralsend`, set:
+  - `NEXT_PUBLIC_BASE_PATH=/coralsend`
+- Ensure reverse proxy routes that path to `web:3000`.
+- `NEXT_PUBLIC_SIGNALING_URL` should still point to `/ws` on the same external domain (or a dedicated WS domain).
+
+## Runtime behavior (step-by-step)
+
+1. User A opens the app and creates a room.
+2. User B joins via URL/QR.
+3. Both clients connect to signaling over WebSocket (`/ws`) and exchange SDP/ICE.
+4. Browser ICE gathers candidates from:
+   - configured STUN (`NEXT_PUBLIC_STUN_URL`)
+   - configured TURN (`NEXT_PUBLIC_TURN_URL`, credentials)
+5. If direct P2P is blocked, TURN relay is used.
+6. DataChannel opens and file chunks flow browser-to-browser.
+7. Server and TURN do not store files; they facilitate connectivity/signaling only.
+
+## CI/CD: Build and publish Docker images to GHCR
+
+This repository includes a GitHub Actions workflow at `.github/workflows/docker.yml` that:
+- Builds `deploy/Dockerfile.server` and `deploy/Dockerfile.web`
+- Publishes to GHCR:
+  - `ghcr.io/<owner>/coralsend-server`
+  - `ghcr.io/<owner>/coralsend-web`
+- Tags images with branch, semver tags, and commit SHA
+
+### Required repository settings
+
+- Repository visibility/settings must allow publishing packages to GHCR
+- `GITHUB_TOKEN` package write is enabled (workflow sets `packages: write`)
+
+### Release flow
+
+1. Push to `main` -> workflow builds and publishes `:main` and SHA tags.
+2. Create a git tag like `v1.2.0` -> workflow also publishes semver tags.
+3. Set `SERVER_IMAGE` / `WEB_IMAGE` in `.env` to selected tags and redeploy compose.
+
 ## Operational checklist (for confidence)
 
 ### Functional checks
@@ -245,6 +360,6 @@ The app will automatically compute the WebSocket URL for signaling using your cu
 
 - **Add E2EE with a key in URL fragment** (`#key=...`) + AES-GCM chunk encryption in the browser.
 - **Add “pairing confirmation”** (receiver requests; sender approves) to prevent unwanted joins.
-- **Add TURN support** for reliable connections in restrictive networks.
+- **Harden TURN for production** (TLS TURN, long-term creds rotation, metrics/alerts).
 - **Add expiry policies** and optional “store-and-forward” fallback for async delivery.
 

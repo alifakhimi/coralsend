@@ -11,8 +11,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/server
 FROM debian:bookworm-slim
 WORKDIR /root/
 
-# Install CA certificates for TLS verification
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+# Install CA certificates and curl (used by Docker healthchecks)
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/main .
 EXPOSE 8080

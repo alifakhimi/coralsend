@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { ASSETS } from '@/lib/constants';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -7,27 +8,27 @@ export const metadata: Metadata = {
   keywords: ['file transfer', 'p2p', 'secure', 'encrypted', 'file sharing', 'webrtc'],
   authors: [{ name: 'CoralSend' }],
   creator: 'CoralSend',
-  manifest: '/manifest.json',
+  manifest: ASSETS.manifest,
   icons: {
     icon: [
-      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
-      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
-      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: ASSETS.favicon16, sizes: '16x16', type: 'image/png' },
+      { url: ASSETS.favicon32, sizes: '32x32', type: 'image/png' },
+      { url: ASSETS.iconSvg, type: 'image/svg+xml' },
     ],
-    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+    apple: [{ url: ASSETS.appleTouchIcon, sizes: '180x180', type: 'image/png' }],
   },
   openGraph: {
     type: 'website',
     title: 'CoralSend - Secure P2P File Transfer',
     description: 'Transfer files securely and directly between devices. No sign-up, no storage, just secure peer-to-peer file sharing.',
     siteName: 'CoralSend',
-    images: [{ url: '/og.png', width: 1200, height: 630, alt: 'CoralSend' }],
+    images: [{ url: ASSETS.ogImage, width: 1200, height: 630, alt: 'CoralSend' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'CoralSend - Secure P2P File Transfer',
     description: 'Transfer files securely and directly between devices.',
-    images: ['/og.png'],
+    images: [ASSETS.ogImage],
   },
   appleWebApp: {
     capable: true,

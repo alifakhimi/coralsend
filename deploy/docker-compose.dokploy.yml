@@ -46,6 +46,7 @@ services:
     command:
       - -n
       - --log-file=stdout
+      - --listening-ip=0.0.0.0
       - --listening-port=3478
       - --min-port=49160
       - --max-port=49200
@@ -54,6 +55,8 @@ services:
       - --user=${TURN_USER:-coralsend_prod}:${TURN_PASSWORD:-change-this-turn-password}
       - --external-ip=${TURN_EXTERNAL_IP:-109.199.112.84}
       - --fingerprint
+      - --no-tls
+      - --no-dtls
       - --no-cli
     ports:
       - "3478:3478/udp"

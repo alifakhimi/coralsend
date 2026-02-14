@@ -992,8 +992,8 @@ export const useWebRTC = () => {
       return;
     }
 
-    // Determine if we should be initiator (alphabetically lower device ID initiates)
-    const isInitiator = myDeviceId < remoteDeviceId;
+    // Keep initiator election consistent with the main signaling flow.
+    const isInitiator = myDeviceId > remoteDeviceId;
 
     const pc = createPeerConnection(remoteDeviceId, isInitiator);
 

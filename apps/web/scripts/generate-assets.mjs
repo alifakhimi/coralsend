@@ -5,13 +5,15 @@
  */
 
 import sharp from 'sharp';
-import { readFileSync, writeFileSync } from 'fs';
+import toIco from 'to-ico';
+import { writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const PUBLIC = join(ROOT, 'public');
+const APP_DIR = join(ROOT, 'src', 'app');
 const LOGO_PATH = join(PUBLIC, 'coralsend-logo.png');
 const THEME_BG = '#0f172a';
 
@@ -28,8 +30,15 @@ async function main() {
       .png();
 
   // 1. Favicons & icons
-  await square(16).toFile(join(PUBLIC, 'favicon-16x16.png'));
-  await square(32).toFile(join(PUBLIC, 'favicon-32x32.png'));
+  const favicon16 = await logo.clone().resize(16, 16).png().toBuffer();
+  const favicon32 = await logo.clone().resize(32, 32).png().toBuffer();
+  await sharp(favicon16).toFile(join(PUBLIC, 'favicon-16x16.png'));
+  await sharp(favicon32).toFile(join(PUBLIC, 'favicon-32x32.png'));
+
+  // favicon.ico (multi-size for app dir – Next.js serves this at /favicon.ico)
+  const faviconIco = await toIco([favicon16, favicon32]);
+  writeFileSync(join(APP_DIR, 'favicon.ico'), faviconIco);
+
   await square(180).toFile(join(PUBLIC, 'apple-touch-icon.png'));
   await square(192).toFile(join(PUBLIC, 'icon-192.png'));
   await square(512).toFile(join(PUBLIC, 'icon-512.png'));
@@ -77,14 +86,13 @@ async function main() {
     .toFile(join(PUBLIC, 'og.png'));
 
   // 4. icon.svg – embed 32x32 favicon as data URL so it scales from one file
-  const favicon32 = await logo.clone().resize(32, 32).png().toBuffer();
   const b64 = favicon32.toString('base64');
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 32 32" width="32" height="32">
   <image width="32" height="32" href="data:image/png;base64,${b64}"/>
 </svg>`;
   writeFileSync(join(PUBLIC, 'icon.svg'), svg, 'utf8');
 
-  console.log('Generated: favicon-16x16, favicon-32x32, apple-touch-icon, icon-192, icon-512, icon-maskable-192, icon-maskable-512, og.png, icon.svg');
+  console.log('Generated: favicon.ico, favicon-16x16, favicon-32x32, apple-touch-icon, icon-192, icon-512, icon-maskable-192, icon-maskable-512, og.png, icon.svg');
 }
 
 main().catch((e) => {

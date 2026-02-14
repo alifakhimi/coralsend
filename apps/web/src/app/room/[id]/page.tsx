@@ -11,18 +11,16 @@ export default function RoomPage() {
   const params = useParams();
   const router = useRouter();
   const roomId = params.id as string;
+  const normalizedRoomId = extractRoomId(roomId) || roomId.toUpperCase();
   
   const { shareFile, requestFile, sendChat, cleanup, connect, retryConnection } = useWebRTC();
   const currentRoom = useStore((s) => s.currentRoom);
-  const deviceId = useStore((s) => s.deviceId);
   const status = useStore((s) => s.status);
   
   // Join room when component mounts or roomId changes
   useEffect(() => {
-    if (!deviceId) return;
-    
     // Extract room ID from URL
-    const extractedRoomId = extractRoomId(roomId) || roomId.toUpperCase();
+    const extractedRoomId = normalizedRoomId;
     
     // Validate room code
     if (!/^[A-Z0-9]{6}$/.test(extractedRoomId) && !isValidUUID(extractedRoomId)) {
@@ -55,7 +53,7 @@ export default function RoomPage() {
     
     connect(extractedRoomId, isCreate);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomId, deviceId, currentRoom?.id, status]);
+  }, [normalizedRoomId, currentRoom?.id, status]);
 
   // Leave room
   const leaveRoom = () => {
@@ -64,7 +62,7 @@ export default function RoomPage() {
     router.push('/');
   };
 
-  if (!currentRoom || currentRoom.id !== roomId) {
+  if (!currentRoom || currentRoom.id !== normalizedRoomId) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white flex items-center justify-center">
         <div className="text-center">

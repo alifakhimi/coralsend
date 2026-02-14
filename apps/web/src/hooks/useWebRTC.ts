@@ -44,6 +44,7 @@ const CHUNK_SIZE = 16 * 1024; // 16KB chunks
 const BUFFER_LOW_THRESHOLD = 65536; // 64KB
 const BUFFER_HIGH_THRESHOLD = 1024 * 1024; // 1MB
 const THUMBNAIL_MAX_SIZE = 200; // Max thumbnail dimension
+const ICE_DIAGNOSTICS = process.env.NEXT_PUBLIC_ICE_DIAGNOSTICS === 'true';
 
 // ============ Helpers ============
 
@@ -91,6 +92,64 @@ async function generateThumbnail(file: File): Promise<string | undefined> {
     });
   } catch {
     return undefined;
+  }
+}
+
+function parseCandidateType(candidate: RTCIceCandidate | RTCIceCandidateInit): string {
+  const candidateValue = candidate.candidate ?? '';
+  const match = candidateValue.match(/\btyp\s+([a-zA-Z0-9]+)/);
+  return match?.[1] ?? 'unknown';
+}
+
+async function logSelectedIcePath(pc: RTCPeerConnection, remoteDeviceId: string): Promise<void> {
+  if (!ICE_DIAGNOSTICS) return;
+
+  try {
+    const stats = await pc.getStats();
+    let selectedPair: RTCStats | null = null;
+    const candidates = new Map<string, RTCStats>();
+
+    stats.forEach((report) => {
+      if (report.type === 'local-candidate' || report.type === 'remote-candidate') {
+        candidates.set(report.id, report);
+      }
+      if (report.type === 'candidate-pair') {
+        const pair = report as RTCStats & {
+          selected?: boolean;
+          state?: string;
+          localCandidateId?: string;
+          remoteCandidateId?: string;
+          nominated?: boolean;
+        };
+        if (pair.selected || pair.state === 'succeeded' || pair.nominated) {
+          selectedPair = pair;
+        }
+      }
+    });
+
+    if (!selectedPair) {
+      console.log(`[ICE][${remoteDeviceId}] no selected candidate pair yet`);
+      return;
+    }
+
+    const pair = selectedPair as RTCStats & {
+      localCandidateId?: string;
+      remoteCandidateId?: string;
+      state?: string;
+    };
+    const local = pair.localCandidateId ? candidates.get(pair.localCandidateId) : undefined;
+    const remote = pair.remoteCandidateId ? candidates.get(pair.remoteCandidateId) : undefined;
+
+    const localType = (local as RTCStats & { candidateType?: string } | undefined)?.candidateType ?? 'unknown';
+    const remoteType = (remote as RTCStats & { candidateType?: string } | undefined)?.candidateType ?? 'unknown';
+    const localProtocol = (local as RTCStats & { protocol?: string } | undefined)?.protocol ?? 'unknown';
+    const remoteProtocol = (remote as RTCStats & { protocol?: string } | undefined)?.protocol ?? 'unknown';
+
+    console.log(
+      `[ICE][${remoteDeviceId}] selected pair state=${pair.state ?? 'unknown'} local=${localType}/${localProtocol} remote=${remoteType}/${remoteProtocol}`
+    );
+  } catch (error) {
+    console.warn(`[ICE][${remoteDeviceId}] failed to read selected candidate pair`, error);
   }
 }
 
@@ -287,6 +346,10 @@ export const useWebRTC = () => {
     peers.current.set(remoteDeviceId, pc);
 
     pc.onicecandidate = (event) => {
+      if (ICE_DIAGNOSTICS && event.candidate) {
+        const candidateType = parseCandidateType(event.candidate);
+        console.log(`[ICE][${remoteDeviceId}] local candidate: ${candidateType}`);
+      }
       if (event.candidate && ws.current?.readyState === WebSocket.OPEN) {
         ws.current.send(JSON.stringify({
           type: 'candidate',
@@ -303,6 +366,7 @@ export const useWebRTC = () => {
 
       if (state === 'connected' || state === 'completed') {
         useStore.getState().updateMemberStatus(remoteDeviceId, 'online');
+        void logSelectedIcePath(pc, remoteDeviceId);
       } else if (state === 'disconnected' || state === 'failed' || state === 'closed') {
         const store = useStore.getState();
         store.updateMemberStatus(remoteDeviceId, 'offline');
@@ -352,6 +416,14 @@ export const useWebRTC = () => {
             }
           }, 3000); // Retry after 3 seconds
         }
+      }
+    };
+
+    pc.onicecandidateerror = (event) => {
+      if (ICE_DIAGNOSTICS) {
+        console.warn(
+          `[ICE][${remoteDeviceId}] candidate error: ${event.errorCode} ${event.errorText} (${event.url || 'no-url'})`
+        );
       }
     };
 

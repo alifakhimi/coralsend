@@ -1,3 +1,18 @@
+/** Public asset URLs (generated from coralsend-logo.png via npm run generate-assets) */
+export const ASSETS = {
+  favicon16: '/favicon-16x16.png',
+  favicon32: '/favicon-32x32.png',
+  iconSvg: '/icon.svg',
+  appleTouchIcon: '/apple-touch-icon.png',
+  ogImage: '/og.png',
+  logo: '/coralsend-logo.png',
+  icon192: '/icon-192.png',
+  icon512: '/icon-512.png',
+  iconMaskable192: '/icon-maskable-192.png',
+  iconMaskable512: '/icon-maskable-512.png',
+  manifest: '/manifest.json',
+} as const;
+
 // Get base URL (origin only)
 export const getBaseUrl = (): string => {
   if (typeof window !== 'undefined') {

@@ -16,6 +16,20 @@ export function formatFileSize(bytes: number): string {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 }
 
+// Format transfer speed (bytes/sec) to human readable
+export function formatSpeed(bytesPerSec: number): string {
+  if (bytesPerSec <= 0) return '';
+  return `${formatFileSize(bytesPerSec)}/s`;
+}
+
+// Format ETA in seconds to human readable
+export function formatEta(seconds: number): string {
+  if (seconds <= 0 || !isFinite(seconds)) return '';
+  if (seconds < 60) return `~${Math.ceil(seconds)}s`;
+  if (seconds < 3600) return `~${Math.ceil(seconds / 60)}m`;
+  return `~${Math.floor(seconds / 3600)}h ${Math.ceil((seconds % 3600) / 60)}m`;
+}
+
 // Get file icon based on mime type
 export function getFileIcon(mimeType: string): string {
   if (mimeType.startsWith('image/')) return '🖼️';

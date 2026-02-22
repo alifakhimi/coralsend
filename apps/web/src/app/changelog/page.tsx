@@ -16,7 +16,7 @@ export default function ChangelogPage() {
       <div className="relative z-10 max-w-2xl mx-auto px-4 py-10">
         <button
           onClick={() => router.back()}
-          className="inline-flex items-center gap-2 text-[var(--text-muted)] hover:text-teal-400 text-sm mb-8 transition-colors"
+          className="inline-flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--color-accent-hover)] text-sm mb-8 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
@@ -34,7 +34,7 @@ export default function ChangelogPage() {
               href={releasesUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 mt-4 text-teal-400 hover:text-teal-300 text-sm font-medium transition-colors"
+              className="inline-flex items-center gap-2 mt-4 text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] text-sm font-medium transition-colors"
             >
               View releases on GitHub →
             </Link>

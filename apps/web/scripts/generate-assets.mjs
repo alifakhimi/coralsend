@@ -16,11 +16,10 @@ const PUBLIC = join(ROOT, 'public');
 const APP_DIR = join(ROOT, 'src', 'app');
 const LOGO_PATH = join(PUBLIC, 'coralsend-logo.png');
 const THEME_BG = '#0f172a';
+const WHITE_BG = '#ffffff';
 
 async function main() {
   const logo = sharp(LOGO_PATH);
-  const meta = await logo.metadata();
-  const size = Math.min(meta.width ?? 512, meta.height ?? 512);
 
   // Helper: resize logo to square
   const square = (s) =>
@@ -28,6 +27,24 @@ async function main() {
       .clone()
       .resize(s, s)
       .png();
+
+  // Helper: create padded icon on a solid background
+  const iconOnBackground = async (s, background, logoScale = 0.72) => {
+    const logoSize = Math.round(s * logoScale);
+    const offset = Math.round((s - logoSize) / 2);
+    const logoBuffer = await logo.clone().resize(logoSize, logoSize).png().toBuffer();
+
+    return sharp({
+      create: {
+        width: s,
+        height: s,
+        channels: 4,
+        background,
+      },
+    })
+      .composite([{ input: logoBuffer, left: offset, top: offset }])
+      .png();
+  };
 
   // 1. Favicons & icons
   const favicon16 = await logo.clone().resize(16, 16).png().toBuffer();
@@ -39,9 +56,13 @@ async function main() {
   const faviconIco = await toIco([favicon16, favicon32]);
   writeFileSync(join(APP_DIR, 'favicon.ico'), faviconIco);
 
-  await square(180).toFile(join(PUBLIC, 'apple-touch-icon.png'));
+  await (await iconOnBackground(180, WHITE_BG, 0.72)).toFile(join(PUBLIC, 'apple-touch-icon.png'));
   await square(192).toFile(join(PUBLIC, 'icon-192.png'));
   await square(512).toFile(join(PUBLIC, 'icon-512.png'));
+
+  // 1b. PWA app icons (white background + safe padding)
+  await (await iconOnBackground(192, WHITE_BG, 0.72)).toFile(join(PUBLIC, 'pwa-icon-192.png'));
+  await (await iconOnBackground(512, WHITE_BG, 0.72)).toFile(join(PUBLIC, 'pwa-icon-512.png'));
 
   // 2. Maskable icons (logo at 80% in center for safe zone)
   const maskableSizes = [192, 512];
@@ -64,6 +85,11 @@ async function main() {
       .composite([{ input: padded, left: padding, top: padding }])
       .png()
       .toFile(join(PUBLIC, `icon-maskable-${s}.png`));
+  }
+
+  // 2b. PWA maskable icons (extra safe padding on white background)
+  for (const s of maskableSizes) {
+    await (await iconOnBackground(s, WHITE_BG, 0.64)).toFile(join(PUBLIC, `pwa-icon-maskable-${s}.png`));
   }
 
   // 3. Open Graph image 1200x630
@@ -92,7 +118,7 @@ async function main() {
 </svg>`;
   writeFileSync(join(PUBLIC, 'icon.svg'), svg, 'utf8');
 
-  console.log('Generated: favicon.ico, favicon-16x16, favicon-32x32, apple-touch-icon, icon-192, icon-512, icon-maskable-192, icon-maskable-512, og.png, icon.svg');
+  console.log('Generated: favicon.ico, favicon-16x16, favicon-32x32, apple-touch-icon, icon-192, icon-512, pwa-icon-192, pwa-icon-512, icon-maskable-192, icon-maskable-512, pwa-icon-maskable-192, pwa-icon-maskable-512, og.png, icon.svg');
 }
 
 main().catch((e) => {

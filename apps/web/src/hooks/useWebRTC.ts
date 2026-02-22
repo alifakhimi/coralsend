@@ -1,8 +1,9 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { useStore, type Member, type FileMetadata, type ChatMessage } from '@/store/store';
+import { useStore, type Member, type FileMetadata, type ChatMessage, type ConnectionPath } from '@/store/store';
 import { analytics } from '@/lib/analytics';
 import { getSignalingServerUrl, ICE_SERVERS } from '@/lib/constants';
 import { getDeviceId, getShortName } from '@/lib/deviceId';
+import { logger } from '@/lib/logger';
 
 // ============ Types ============
 
@@ -39,11 +40,19 @@ type ChatMessagePayload = {
   timestamp: number;
 };
 
+type FileIdentity = {
+  name: string;
+  size: number;
+  type: string;
+  uploaderId: string;
+};
+
 // ============ Constants ============
 
-const CHUNK_SIZE = 16 * 1024; // 16KB chunks
-const BUFFER_LOW_THRESHOLD = 65536; // 64KB
-const BUFFER_HIGH_THRESHOLD = 1024 * 1024; // 1MB
+const FILE_ID_HEADER = 36;
+const CHUNK_SIZE = 64 * 1024; // 64KB payload (+ 36B header stays well under 256KB maxMessageSize)
+const BUFFER_LOW_THRESHOLD = 128 * 1024; // 128KB (2 chunks)
+const BUFFER_HIGH_THRESHOLD = 1024 * 1024; // 1MB (~16 chunks queued)
 const THUMBNAIL_MAX_SIZE = 200; // Max thumbnail dimension
 const ICE_DIAGNOSTICS = process.env.NEXT_PUBLIC_ICE_DIAGNOSTICS === 'true';
 
@@ -102,9 +111,16 @@ function parseCandidateType(candidate: RTCIceCandidate | RTCIceCandidateInit): s
   return match?.[1] ?? 'unknown';
 }
 
-async function logSelectedIcePath(pc: RTCPeerConnection, remoteDeviceId: string): Promise<void> {
-  if (!ICE_DIAGNOSTICS) return;
+function sameFileIdentity(a: FileIdentity, b: FileIdentity): boolean {
+  return (
+    a.uploaderId === b.uploaderId &&
+    a.name === b.name &&
+    a.size === b.size &&
+    (a.type || 'application/octet-stream') === (b.type || 'application/octet-stream')
+  );
+}
 
+async function detectIcePath(pc: RTCPeerConnection, remoteDeviceId: string): Promise<ConnectionPath> {
   try {
     const stats = await pc.getStats();
     let selectedPair: RTCStats | null = null;
@@ -129,8 +145,8 @@ async function logSelectedIcePath(pc: RTCPeerConnection, remoteDeviceId: string)
     });
 
     if (!selectedPair) {
-      console.log(`[ICE][${remoteDeviceId}] no selected candidate pair yet`);
-      return;
+      if (ICE_DIAGNOSTICS) logger.debug('ICE', `no selected candidate pair yet`, remoteDeviceId);
+      return 'unknown';
     }
 
     const pair = selectedPair as RTCStats & {
@@ -146,11 +162,13 @@ async function logSelectedIcePath(pc: RTCPeerConnection, remoteDeviceId: string)
     const localProtocol = (local as RTCStats & { protocol?: string } | undefined)?.protocol ?? 'unknown';
     const remoteProtocol = (remote as RTCStats & { protocol?: string } | undefined)?.protocol ?? 'unknown';
 
-    console.log(
-      `[ICE][${remoteDeviceId}] selected pair state=${pair.state ?? 'unknown'} local=${localType}/${localProtocol} remote=${remoteType}/${remoteProtocol}`
-    );
+    logger.info('ICE', `selected pair state=${pair.state ?? 'unknown'} local=${localType}/${localProtocol} remote=${remoteType}/${remoteProtocol}`, remoteDeviceId);
+
+    const isRelay = localType === 'relay' || remoteType === 'relay';
+    return isRelay ? 'relay' : 'direct';
   } catch (error) {
-    console.warn(`[ICE][${remoteDeviceId}] failed to read selected candidate pair`, error);
+    logger.warn('ICE', `failed to read selected candidate pair`, `${remoteDeviceId} ${error}`);
+    return 'unknown';
   }
 }
 
@@ -165,7 +183,8 @@ export const useWebRTC = () => {
 
   // File transfer state
   const pendingFiles = useRef<Map<string, File>>(new Map()); // fileId -> File
-  const incomingChunks = useRef<Map<string, { meta: FileMetadataPayload; chunks: ArrayBuffer[] }>>(new Map());
+  const incomingChunks = useRef<Map<string, { meta: FileMetadataPayload; chunks: ArrayBuffer[]; receivedBytes: number; startTime: number }>>(new Map());
+  const earlyChunks = useRef<Map<string, ArrayBuffer[]>>(new Map()); // chunks arriving before file-start
   const receivedFileBlobs = useRef<Map<string, Blob>>(new Map()); // fileId -> Blob (text files only, for copy)
   const requestModes = useRef<Map<string, 'download' | 'copy'>>(new Map()); // requester intent by fileId
   const sendAbortControllers = useRef<Map<string, AbortController>>(new Map()); // `${fileId}-${targetDeviceId}` -> AbortController
@@ -261,7 +280,7 @@ export const useWebRTC = () => {
         if (msg.type === 'file-start') {
           // Receiving file data start
           const meta = msg.payload as FileMetadataPayload;
-          console.log('Receiving file from', senderDeviceId, ':', meta.name);
+          logger.info('Transfer', `Receiving file: ${meta.name}`, senderDeviceId);
 
           // Ensure file exists in store (in case file-meta was missed)
           const existingFile = store.currentRoom?.files.find(f => f.id === meta.id);
@@ -278,7 +297,13 @@ export const useWebRTC = () => {
             }, meta.id);
           }
 
-          incomingChunks.current.set(meta.id, { meta, chunks: [] });
+          const buffered = earlyChunks.current.get(meta.id);
+          const receivedBytes = buffered ? buffered.reduce((s, c) => s + c.byteLength, 0) : 0;
+          incomingChunks.current.set(meta.id, { meta, chunks: buffered ?? [], receivedBytes, startTime: Date.now() });
+          earlyChunks.current.delete(meta.id);
+          if (buffered) {
+            logger.info('Transfer', `Flushed ${buffered.length} early chunks (${receivedBytes} bytes)`, meta.id);
+          }
           store.updateFileStatus(meta.id, 'downloading');
           store.updateFileProgress(meta.id, 0);
 
@@ -297,10 +322,18 @@ export const useWebRTC = () => {
               fileType: incoming.meta.type,
               fileSize: incoming.meta.size,
             });
-            console.log('File transfer complete:', incoming.meta.name);
+            logger.info('Transfer', `File transfer complete: ${incoming.meta.name}`);
             store.updateFileStatus(fileId, 'completed');
             void finalizeReceivedFile(fileId, incoming.meta, incoming.chunks);
+            // Auto-hide downloaded inbox file after a short delay (moves to trash)
+            setTimeout(() => {
+              const f = useStore.getState().currentRoom?.files.find((x) => x.id === fileId);
+              if (f?.direction === 'inbox' && f.status === 'completed') {
+                useStore.getState().removeFile(fileId);
+              }
+            }, 5000);
             incomingChunks.current.delete(fileId);
+            earlyChunks.current.delete(fileId);
             lastProgressReported.current.delete(fileId);
           }
         } else if (msg.type === 'file-progress') {
@@ -334,20 +367,28 @@ export const useWebRTC = () => {
 
     // Binary data (file chunks) with fileId prefix
     if (data instanceof ArrayBuffer) {
-      // First 36 bytes are fileId (padded to 36 chars)
       const decoder = new TextDecoder();
-      const fileIdBytes = data.slice(0, 36);
+      const fileIdBytes = data.slice(0, FILE_ID_HEADER);
       const fileId = decoder.decode(fileIdBytes).trim();
-      const chunk = data.slice(36);
+      const chunk = data.slice(FILE_ID_HEADER);
 
       const incoming = incomingChunks.current.get(fileId);
       if (incoming) {
         incoming.chunks.push(chunk);
-        const received = incoming.chunks.reduce((acc, c) => acc + c.byteLength, 0);
-        const progress = Math.min(100, Math.round((received / incoming.meta.size) * 100));
-        store.updateFileProgress(fileId, progress);
+        incoming.receivedBytes += chunk.byteLength;
+        const progress = Math.min(100, Math.round((incoming.receivedBytes / incoming.meta.size) * 100));
 
-        // Report progress back to sender so avatar matches actual receiver progress (throttle to ~5% steps)
+        // Throttle UI store updates to 1% steps
+        const prevProgress = store.currentRoom?.files.find(f => f.id === fileId)?.progress ?? 0;
+        if (progress >= 100 || progress - prevProgress >= 1) {
+          const elapsed = (Date.now() - incoming.startTime) / 1000;
+          const speed = elapsed > 0 ? incoming.receivedBytes / elapsed : 0;
+          const remaining = incoming.meta.size - incoming.receivedBytes;
+          const eta = speed > 0 ? remaining / speed : 0;
+          store.updateFileTransferStats(fileId, progress, speed, eta);
+        }
+
+        // Report progress back to sender (throttle to ~5% steps)
         const last = lastProgressReported.current.get(fileId) ?? -1;
         if (progress >= 100 || progress - last >= 5) {
           lastProgressReported.current.set(fileId, progress);
@@ -357,7 +398,14 @@ export const useWebRTC = () => {
           }
         }
       } else {
-        console.warn('Received chunk for unknown fileId:', fileId);
+        // Buffer chunks that arrive before their file-start message
+        let buf = earlyChunks.current.get(fileId);
+        if (!buf) {
+          buf = [];
+          earlyChunks.current.set(fileId, buf);
+          logger.debug('Transfer', `Buffering early chunks for fileId: ${fileId}`);
+        }
+        buf.push(chunk);
       }
     }
   }, [finalizeReceivedFile]);
@@ -367,12 +415,12 @@ export const useWebRTC = () => {
     channel.bufferedAmountLowThreshold = BUFFER_LOW_THRESHOLD;
 
     channel.onopen = () => {
-      console.log('Data channel open with', remoteDeviceId);
+      logger.info('DataChannel', `open`, remoteDeviceId);
       useStore.getState().updateMemberStatus(remoteDeviceId, 'online');
     };
 
     channel.onclose = () => {
-      console.log('Data channel closed with', remoteDeviceId);
+      logger.info('DataChannel', `closed`, remoteDeviceId);
       const store = useStore.getState();
       store.updateMemberStatus(remoteDeviceId, 'offline');
 
@@ -380,8 +428,12 @@ export const useWebRTC = () => {
       // This ensures we don't have circular dependencies
     };
 
-    channel.onerror = (error) => {
-      console.error('Data channel error with', remoteDeviceId, ':', error);
+    channel.onerror = (event) => {
+      const rtcErr = (event as RTCErrorEvent).error;
+      const detail = rtcErr
+        ? `${rtcErr.errorDetail ?? ''} ${rtcErr.message ?? ''}`.trim()
+        : 'unknown error';
+      logger.error('DataChannel', `error with ${remoteDeviceId}`, detail);
     };
 
     channel.onmessage = (event) => handleDataMessage(remoteDeviceId, event.data);
@@ -420,7 +472,7 @@ export const useWebRTC = () => {
       }
     }
 
-    console.log('Creating peer connection with', remoteDeviceId, isInitiator ? '(initiator)' : '(receiver)');
+    logger.info('ICE', `Creating peer connection ${isInitiator ? '(initiator)' : '(receiver)'}`, remoteDeviceId);
 
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
     peers.current.set(remoteDeviceId, pc);
@@ -442,11 +494,13 @@ export const useWebRTC = () => {
 
     pc.oniceconnectionstatechange = () => {
       const state = pc.iceConnectionState;
-      console.log('ICE connection state with', remoteDeviceId, ':', state);
+      logger.info('ICE', `connection state: ${state}`, remoteDeviceId);
 
       if (state === 'connected' || state === 'completed') {
         useStore.getState().updateMemberStatus(remoteDeviceId, 'online');
-        void logSelectedIcePath(pc, remoteDeviceId);
+        void detectIcePath(pc, remoteDeviceId).then((path) => {
+          useStore.getState().updateMemberConnectionPath(remoteDeviceId, path);
+        });
       } else if (state === 'disconnected' || state === 'failed' || state === 'closed') {
         const store = useStore.getState();
         store.updateMemberStatus(remoteDeviceId, 'offline');
@@ -509,7 +563,7 @@ export const useWebRTC = () => {
 
     pc.onconnectionstatechange = () => {
       const state = pc.connectionState;
-      console.log('Connection state with', remoteDeviceId, ':', state);
+      logger.info('ICE', `peer connection state: ${state}`, remoteDeviceId);
 
       if (state === 'connected') {
         useStore.getState().updateMemberStatus(remoteDeviceId, 'online');
@@ -797,6 +851,20 @@ export const useWebRTC = () => {
           // Received file metadata from another member
           const meta = msg.payload as FileMetadataPayload;
           if (meta.uploaderId !== myDeviceId) {
+            // Prevent duplicate inbox entries when the same file is re-shared with a new id.
+            const duplicate = store.currentRoom?.files.find((f) =>
+              f.direction === 'inbox' &&
+              sameFileIdentity(
+                { name: f.name, size: f.size, type: f.type, uploaderId: f.uploaderId },
+                { name: meta.name, size: meta.size, type: meta.type, uploaderId: meta.uploaderId }
+              ) &&
+              f.id !== meta.id
+            );
+            if (duplicate) {
+              logger.debug('Transfer', `Skip duplicate inbox meta for ${meta.name}`, meta.id);
+              break;
+            }
+
             console.log('File available:', meta.name, 'from', meta.uploaderName, meta.thumbnailUrl ? '(with thumbnail)' : '');
             store.addFile({
               name: meta.name,
@@ -812,9 +880,41 @@ export const useWebRTC = () => {
           break;
         }
 
+        case 'file-meta-sync-request': {
+          // Another peer asks us to resend current outbox metadata
+          const myFiles = store.currentRoom?.files.filter(
+            (f) => f.direction === 'outbox' && !f.trashed
+          ) || [];
+          myFiles.forEach((file) => {
+            const meta: FileMetadataPayload = {
+              id: file.id,
+              name: file.name,
+              size: file.size,
+              type: file.type,
+              uploaderId: store.deviceId!,
+              uploaderName: getShortName(store.deviceId!),
+              uploadedAt: file.uploadedAt,
+              thumbnailUrl: file.thumbnailUrl,
+            };
+            ws.current?.send(JSON.stringify({
+              type: 'file-meta',
+              roomId: store.currentRoom?.id,
+              payload: meta,
+            }));
+          });
+          break;
+        }
+
         case 'file-request': {
           // Someone wants to download a file I shared
           const { fileId, requesterId } = msg.payload as { fileId: string; requesterId: string };
+          const stillShared = store.currentRoom?.files.some(
+            (f) => f.id === fileId && f.direction === 'outbox'
+          );
+          if (!stillShared) {
+            pendingFiles.current.delete(fileId);
+            break;
+          }
           const file = pendingFiles.current.get(fileId);
           if (file) {
             const requester = store.currentRoom?.members.find(m => m.deviceId === requesterId);
@@ -862,12 +962,12 @@ export const useWebRTC = () => {
     }
 
     const wsUrl = getSignalingServerUrl();
-    console.log('Connecting to signaling server:', wsUrl);
+    logger.info('Signaling', `Connecting to ${wsUrl}`);
 
     ws.current = new WebSocket(wsUrl);
 
     ws.current.onopen = () => {
-      console.log('WebSocket connected');
+      logger.info('Signaling', 'WebSocket connected');
 
       const joinPayload = { deviceId, displayName };
       ws.current?.send(JSON.stringify({
@@ -887,13 +987,13 @@ export const useWebRTC = () => {
     };
 
     ws.current.onerror = (err) => {
-      console.error('WebSocket error:', err);
+      logger.error('Signaling', 'WebSocket error', String(err));
       store.setError(`Connection failed: ${wsUrl}`);
       store.setStatus('error');
     };
 
     ws.current.onclose = (event) => {
-      console.log('WebSocket closed:', event.code);
+      logger.info('Signaling', `WebSocket closed: ${event.code}`);
       if (event.code !== 1000 && store.status !== 'idle') {
         store.setStatus('disconnected');
       }
@@ -906,23 +1006,37 @@ export const useWebRTC = () => {
     const store = useStore.getState();
     const room = store.currentRoom;
     if (!room || !store.deviceId) return;
+    const myDeviceId = store.deviceId;
 
-    const fileId = Math.random().toString(36).substring(2, 15);
-    const myName = getShortName(store.deviceId);
+    const existingOutbox = room.files.find((f) =>
+      f.direction === 'outbox' &&
+      sameFileIdentity(
+        { name: f.name, size: f.size, type: f.type, uploaderId: f.uploaderId },
+        {
+          name: file.name,
+          size: file.size,
+          type: file.type || 'application/octet-stream',
+          uploaderId: myDeviceId,
+        }
+      )
+    );
+
+    const fileId = existingOutbox?.id ?? Math.random().toString(36).substring(2, 15);
+    const myName = getShortName(myDeviceId);
     const uploadedAt = Date.now();
 
-    // Store file for later transfer requests
+    // Store/refresh file source for transfer requests.
     pendingFiles.current.set(fileId, file);
 
     // Generate thumbnail for images
     const thumbnailUrl = await generateThumbnail(file);
 
-    // Add to outbox with the same fileId
+    // Add to outbox with the same fileId (existing id if duplicate).
     store.addFile({
       name: file.name,
       size: file.size,
       type: file.type || 'application/octet-stream',
-      uploaderId: store.deviceId,
+      uploaderId: myDeviceId,
       uploaderName: myName,
       uploadedAt,
       direction: 'outbox',
@@ -935,7 +1049,7 @@ export const useWebRTC = () => {
       name: file.name,
       size: file.size,
       type: file.type || 'application/octet-stream',
-      uploaderId: store.deviceId,
+      uploaderId: myDeviceId,
       uploaderName: myName,
       uploadedAt,
       thumbnailUrl,
@@ -994,11 +1108,40 @@ export const useWebRTC = () => {
     store.updateFileProgress(file.id, 0);
   }, []);
 
+  const requestFileMetaSync = useCallback(() => {
+    const store = useStore.getState();
+    const room = store.currentRoom;
+    if (!room) return;
+
+    // Full inbox reset before resync:
+    // clear current inbox list (including trash), transient download state, and cached text blobs.
+    const inboxIds = room.files
+      .filter((f) => f.direction === 'inbox')
+      .map((f) => f.id);
+
+    if (inboxIds.length > 0) {
+      store.purgeFiles(inboxIds);
+      inboxIds.forEach((id) => {
+        incomingChunks.current.delete(id);
+        earlyChunks.current.delete(id);
+        requestModes.current.delete(id);
+        receivedFileBlobs.current.delete(id);
+        lastProgressReported.current.delete(id);
+      });
+    }
+
+    ws.current?.send(JSON.stringify({
+      type: 'file-meta-sync-request',
+      roomId: room.id,
+      payload: { requesterId: store.deviceId },
+    }));
+  }, []);
+
   // Send file to a specific peer
   const sendFileToOne = useCallback(async (file: File, fileId: string, targetDeviceId: string) => {
     const dc = dataChannels.current.get(targetDeviceId);
     if (!dc || dc.readyState !== 'open') {
-      console.error('No data channel to', targetDeviceId);
+      logger.error('Transfer', `No data channel`, targetDeviceId);
       return;
     }
 
@@ -1029,13 +1172,18 @@ export const useWebRTC = () => {
       const totalBytes = buffer.byteLength;
       let offset = 0;
       const encoder = new TextEncoder();
-      const fileIdBytes = encoder.encode(fileId.padEnd(36, ' '));
+      const fileIdBytes = encoder.encode(fileId.padEnd(FILE_ID_HEADER, ' '));
+
+      // Pre-allocate reusable send buffer to avoid per-chunk allocation
+      const sendBuf = new Uint8Array(FILE_ID_HEADER + CHUNK_SIZE);
+      sendBuf.set(fileIdBytes, 0);
+      let lastSenderProgress = 0;
 
       const sendChunk = (): Promise<void> => {
         return new Promise((resolve, reject) => {
           const send = () => {
             try {
-              while (offset < buffer.byteLength) {
+              while (offset < totalBytes) {
                 if (ac.signal.aborted) {
                   reject(new Error('Cancelled'));
                   return;
@@ -1049,17 +1197,21 @@ export const useWebRTC = () => {
                   return;
                 }
 
-                const end = Math.min(offset + CHUNK_SIZE, buffer.byteLength);
-                const chunk = buffer.slice(offset, end);
+                const end = Math.min(offset + CHUNK_SIZE, totalBytes);
+                const chunkLen = end - offset;
 
-                // Prepend fileId to chunk
-                const combined = new Uint8Array(36 + chunk.byteLength);
-                combined.set(fileIdBytes, 0);
-                combined.set(new Uint8Array(chunk), 36);
+                // Reuse pre-allocated buffer: copy chunk data after the 36-byte header
+                sendBuf.set(new Uint8Array(buffer, offset, chunkLen), FILE_ID_HEADER);
+                dc.send(sendBuf.buffer.slice(0, FILE_ID_HEADER + chunkLen));
 
-                dc.send(combined.buffer);
                 offset = end;
-                // Progress is reported by receiver via file-progress messages (avatar matches actual download)
+
+                // Sender-side progress (throttled to 1% steps)
+                const senderProgress = Math.min(100, Math.round((offset / totalBytes) * 100));
+                if (senderProgress >= 100 || senderProgress - lastSenderProgress >= 1) {
+                  lastSenderProgress = senderProgress;
+                  store.updateFileDownloaderProgress(fileId, targetDeviceId, senderProgress);
+                }
               }
               resolve();
             } catch (err) {
@@ -1075,11 +1227,11 @@ export const useWebRTC = () => {
       // Send end message (receiver will send file-progress 100% when done, then we remove downloader)
       dc.send(JSON.stringify({ type: 'file-end', fileId }));
       completed = true;
-      console.log('File sent to', targetDeviceId);
+      logger.info('Transfer', `File sent`, targetDeviceId);
 
     } catch (err) {
       if ((err as Error).message !== 'Cancelled') {
-        console.error('Send error:', err);
+        logger.error('Transfer', `Send error: ${err}`);
       }
     } finally {
       sendAbortControllers.current.delete(abortKey);
@@ -1225,6 +1377,7 @@ export const useWebRTC = () => {
     connect,
     shareFile,
     requestFile,
+    requestFileMetaSync,
     cancelFileDownload,
     sendChat,
     cleanup,

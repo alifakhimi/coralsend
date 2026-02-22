@@ -1,28 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { useStore } from '@/store/store';
+import { useToastStore } from '@/store/toast';
 import { getShortName } from '@/lib/deviceId';
 import {
   Logo,
-  Button,
   Card,
-  QRScanner,
   RoomHistory,
-  CreateRoomButton,
+  ActionCard,
   SocialLinks,
   ThemeToggle,
 } from '@/components/ui';
 import { APP_VERSION } from '@/lib/constants';
 import {
+  Plus,
   QrCode,
-  ClipboardPaste,
-  AlertCircle,
-  X,
-  ArrowLeft,
   User,
-  Home,
+  Globe,
   Rocket,
 } from 'lucide-react';
 
@@ -33,46 +29,42 @@ interface HomeViewProps {
 }
 
 export function HomeView({ onCreateRoom, onJoinRoom, onPasteLink }: HomeViewProps) {
-  const [showScanner, setShowScanner] = useState(false);
   const deviceId = useStore((s) => s.deviceId);
   const error = useStore((s) => s.error);
   const pendingShareFiles = useStore((s) => s.pendingShareFiles);
-  const [linkError, setLinkError] = useState<string | null>(null);
+  const showToast = useToastStore((s) => s.showToast);
+
+  useEffect(() => {
+    if (error) {
+      showToast(error, 'error');
+      useStore.getState().setError(null);
+    }
+  }, [error, showToast]);
 
   const handleJoinRoom = (roomIdOrUrl: string) => {
-    setShowScanner(false);
     onJoinRoom(roomIdOrUrl);
   };
 
-  const visibleError = linkError || error;
-
   return (
-    <div className="h-screen flex flex-col animate-in fade-in duration-300">
+    <div className="h-dvh flex flex-col animate-in fade-in duration-300">
       {/* Header */}
-      <header className="flex-shrink-0 p-3 sm:p-4">
+      <header className="flex-shrink-0 px-4 pt-3 pb-2 sm:pt-4 sm:pb-3">
         <div className="max-w-md mx-auto flex items-center justify-between">
-          <Link
-            href="/"
-            className="flex items-center gap-1.5 text-[var(--text-muted)] hover:text-teal-400 transition-colors text-sm"
-            aria-label="Website Home"
-          >
-            <Home className="w-4 h-4" />
-            <span className="hidden sm:inline">Website</span>
-          </Link>
+          <Logo size="sm" />
           <div className="flex items-center gap-2">
             <ThemeToggle />
             {deviceId && (
               <div className="flex items-center gap-2 glass border border-[var(--border-soft)] rounded-full py-1 pl-2.5 pr-3">
                 <div className="flex flex-col items-start leading-tight">
-                  <span className="text-[9px] uppercase tracking-wider text-[var(--text-muted)] font-bold">
+                  <span className="text-xs uppercase tracking-wider text-[var(--text-muted)] font-bold">
                     My Device
                   </span>
                   <span className="text-xs font-semibold text-[var(--text-primary)]">
                     {getShortName(deviceId)}
                   </span>
                 </div>
-                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-teal-500/20 to-cyan-500/20 border border-teal-500/30 flex items-center justify-center">
-                  <User className="w-3.5 h-3.5 text-teal-400" />
+                <div className="w-7 h-7 rounded-full bg-[var(--color-accent-subtle)] border border-[var(--color-accent-border)] flex items-center justify-center">
+                  <User className="w-3.5 h-3.5 text-[var(--color-accent)]" />
                 </div>
               </div>
             )}
@@ -80,123 +72,68 @@ export function HomeView({ onCreateRoom, onJoinRoom, onPasteLink }: HomeViewProp
         </div>
       </header>
 
-      {/* Main content */}
+      {/* Content */}
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-2 overflow-y-auto">
         <div className="w-full max-w-md space-y-3 sm:space-y-4">
-          {/* Logo and tagline */}
-          <div className="text-center space-y-2">
-            <Logo size="md" className="justify-center" />
-            <p className="text-[var(--text-muted)] text-sm sm:text-base">Multi-Peer File Sharing</p>
-          </div>
+          {/* Tagline */}
+          <p className="text-center text-[var(--text-muted)] text-sm sm:text-base">
+            Secure peer-to-peer file sharing
+          </p>
 
-          {/* Error message */}
-          {visibleError && (
-            <Card variant="bordered" className="border-red-500/30 bg-red-500/5">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-                <div className="flex-1">
-                  <p className="text-red-400 text-sm">{visibleError}</p>
-                </div>
-                <button
-                  onClick={() => {
-                    setLinkError(null);
-                    useStore.getState().setError(null);
-                  }}
-                >
-                  <X className="w-4 h-4 text-red-400" />
-                </button>
-              </div>
-            </Card>
-          )}
-
-          {/* Pending share files (from PWA share_target) */}
+          {/* Pending share files */}
           {pendingShareFiles.length > 0 && (
-            <Card variant="bordered" className="border-teal-500/30 bg-teal-500/5">
-              <p className="text-teal-400 text-sm">
+            <Card variant="bordered" className="border-[var(--color-accent-border)] bg-[var(--color-accent-subtle)] p-3">
+              <p className="text-[var(--color-accent)] text-sm">
                 You have {pendingShareFiles.length} file{pendingShareFiles.length !== 1 ? 's' : ''} to share. Create or join a room to send them.
               </p>
             </Card>
           )}
 
-          {/* Scanner view */}
-          {showScanner ? (
-            <div className="space-y-3 animate-in fade-in slide-in-from-right duration-200">
-              <div className="flex items-center justify-between">
-                <Button variant="ghost" size="sm" onClick={() => setShowScanner(false)}>
-                  <ArrowLeft className="w-4 h-4" />
-                  Back
-                </Button>
-              </div>
+          {/* Actions */}
+          <div className="space-y-3 animate-in fade-in duration-200">
+            <ActionCard
+              variant="highlight"
+              icon={Plus}
+              title="Create Room"
+              description="Start a new sharing session"
+              onClick={onCreateRoom}
+            />
+            <ActionCard
+              variant="default"
+              icon={QrCode}
+              title="Join Room"
+              description="Scan QR code, paste link, or enter code"
+              href="/app/join"
+            />
+            <ActionCard
+              variant="default"
+              icon={Rocket}
+              title="Getting Started"
+              description="Step-by-step guide to share files"
+              href="/guide"
+            />
 
-              <Card variant="bordered" className="overflow-hidden p-0">
-                <QRScanner onScan={handleJoinRoom} onError={(e) => setLinkError(e)} />
-              </Card>
-
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-[var(--border-soft)]" />
-                </div>
-                <div className="relative flex justify-center">
-                  <span className="bg-[var(--bg-base)] px-4 text-sm text-[var(--text-muted)]">or</span>
-                </div>
-              </div>
-
-              <Button variant="secondary" className="w-full" onClick={onPasteLink}>
-                <ClipboardPaste className="w-4 h-4" />
-                Paste Room Code
-              </Button>
-            </div>
-          ) : (
-            /* Main actions */
-            <div className="space-y-3 animate-in fade-in slide-in-from-left duration-200">
-              <CreateRoomButton onClick={onCreateRoom} />
-
-              {/* Getting Started */}
-              <Link href="/guide" className="block w-full group">
-                <Card variant="bordered" className="p-4 sm:p-5 hover:border-teal-500/30 transition-all">
-                  <div className="flex items-center gap-3 sm:gap-4">
-                    <div className="w-12 h-12 sm:w-14 sm:h-14 bg-[var(--surface-glass-strong)] rounded-lg sm:rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <Rocket className="w-6 h-6 sm:w-7 sm:h-7 text-teal-400" />
-                    </div>
-                    <div className="text-left">
-                      <h3 className="text-lg sm:text-xl font-semibold text-[var(--text-primary)]">Getting Started</h3>
-                      <p className="text-[var(--text-muted)] text-xs sm:text-sm">Step-by-step guide to share files</p>
-                    </div>
-                  </div>
-                </Card>
-              </Link>
-
-              {/* Join Room */}
-              <button onClick={() => setShowScanner(true)} className="w-full group">
-                <Card variant="bordered" className="p-4 sm:p-5 hover:border-[var(--border-soft)] transition-all">
-                  <div className="flex items-center gap-3 sm:gap-4">
-                    <div className="w-12 h-12 sm:w-14 sm:h-14 bg-[var(--surface-glass-strong)] rounded-lg sm:rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <QrCode className="w-6 h-6 sm:w-7 sm:h-7 text-cyan-400" />
-                    </div>
-                    <div className="text-left">
-                      <h3 className="text-lg sm:text-xl font-semibold text-[var(--text-primary)]">Join Room</h3>
-                      <p className="text-[var(--text-muted)] text-xs sm:text-sm">Scan QR code or enter code</p>
-                    </div>
-                  </div>
-                </Card>
-              </button>
-
-              {/* Room History */}
-              <RoomHistory onRejoin={handleJoinRoom} />
-            </div>
-          )}
+            {/* Room History */}
+            <RoomHistory onRejoin={handleJoinRoom} />
+          </div>
         </div>
       </div>
 
       {/* Footer */}
-      <footer className="flex-shrink-0 py-3 px-4 flex flex-col items-center gap-2 text-[var(--text-muted)] text-[10px] sm:text-xs">
-        <p>Files are transferred directly between devices</p>
-        <div className="flex items-center gap-3 flex-wrap justify-center">
+      <footer className="flex-shrink-0 py-4 px-4 flex flex-col items-center gap-3 text-[var(--text-muted)]">
+        <p className="text-sm">Files are transferred directly between devices</p>
+        <div className="flex items-center gap-3 flex-wrap justify-center text-xs">
           <span>v{APP_VERSION}</span>
-          <Link href="/changelog" className="hover:text-teal-400 transition-colors">
-            Changelog
-          </Link>
           <SocialLinks iconSize={16} />
+          <Link
+            href="/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 hover:text-[var(--color-accent-hover)] transition-colors"
+          >
+            <Globe className="w-3.5 h-3.5" />
+            Website
+          </Link>
         </div>
       </footer>
     </div>

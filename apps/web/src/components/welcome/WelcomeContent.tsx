@@ -1,83 +1,150 @@
 import Link from 'next/link';
-import { Shield, Smartphone, Share2, UserX, Zap } from 'lucide-react';
+import Image from 'next/image';
+import { Shield, Smartphone, Share2, UserX, Zap, Lock, Wifi, FileCheck, ArrowRight } from 'lucide-react';
 import { SocialLinks } from '@/components/ui';
 import { APP_VERSION } from '@/lib/constants';
+import { ASSETS } from '@/lib/constants';
 
 const FEATURES = [
   {
     icon: Zap,
-    title: 'P2P transfer',
-    description: 'Files go directly between devices. No server storage.',
+    title: 'Peer-to-peer transfer',
+    description:
+      'Files travel directly between your device and the receiver. No server storage, no cloud—just a secure channel between two browsers.',
   },
   {
     icon: Shield,
     title: 'Encrypted in transit',
-    description: 'WebRTC uses DTLS so data is protected while moving.',
+    description:
+      'WebRTC uses DTLS to encrypt all data. File bytes are protected from the moment they leave your device until they reach the other side.',
   },
   {
     icon: Smartphone,
-    title: 'PWA',
-    description: 'Install on your phone or desktop and use like an app.',
+    title: 'Progressive Web App',
+    description:
+      'Install CoralSend on your phone or desktop. It works like a native app—offline-capable, fast, and always up to date.',
   },
   {
     icon: Share2,
     title: 'Share target',
-    description: 'Share files from other apps straight into CoralSend.',
+    description:
+      'Share files from Photos, Files, or any app directly into CoralSend. One tap to send—no copy-paste or email needed.',
   },
   {
     icon: UserX,
-    title: 'No sign-up',
-    description: 'Create a room and share the link. No account needed.',
+    title: 'No sign-up required',
+    description:
+      'Create a room, share the link, and start sending. No account, no password, no email. Privacy by design.',
   },
 ];
 
 export function WelcomeContent() {
   return (
-    <div className="space-y-12">
-      <section id="features">
-        <h2 className="text-xl font-semibold text-[var(--text-primary)] mb-4">Features</h2>
-        <ul className="space-y-4">
+    <div className="space-y-20 sm:space-y-24">
+      {/* Features */}
+      <section id="features" aria-labelledby="features-heading">
+        <h2 id="features-heading" className="text-2xl font-bold text-[var(--text-primary)] mb-8 sm:mb-10">
+          Why CoralSend?
+        </h2>
+        <ul className="space-y-6 sm:space-y-8">
           {FEATURES.map(({ icon: Icon, title, description }) => (
-            <li key={title} className="flex gap-3">
-              <div className="shrink-0 w-10 h-10 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center">
-                <Icon className="w-5 h-5 text-teal-400" />
+            <li key={title} className="flex gap-4 sm:gap-5">
+              <div className="shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[var(--color-accent-subtle)] border border-[var(--color-accent-border)] flex items-center justify-center">
+                <Icon className="w-6 h-6 sm:w-7 sm:h-7 text-[var(--color-accent)]" aria-hidden />
               </div>
               <div>
-                <p className="font-medium text-[var(--text-primary)]">{title}</p>
-                <p className="text-[var(--text-muted)] text-sm mt-0.5">{description}</p>
+                <h3 className="font-semibold text-[var(--text-primary)] text-base sm:text-lg mb-1">{title}</h3>
+                <p className="text-[var(--text-muted)] text-sm sm:text-base leading-relaxed">{description}</p>
               </div>
             </li>
           ))}
         </ul>
       </section>
 
-      <section id="how-it-works">
-        <h2 className="text-xl font-semibold text-[var(--text-primary)] mb-4">How it works</h2>
-        <p className="text-[var(--text-muted)] text-sm leading-relaxed">
-          CoralSend uses a signaling server only to help your browser connect to the other person&apos;s browser. Room IDs and connection metadata pass through the server; file bytes never do. Once the WebRTC data channel is open, files are sent directly between devices and are encrypted in transit (DTLS).
-        </p>
+      {/* How it works */}
+      <section id="how-it-works" aria-labelledby="how-heading">
+        <h2 id="how-heading" className="text-2xl font-bold text-[var(--text-primary)] mb-6 sm:mb-8">
+          How it works
+        </h2>
+        <div className="glass rounded-2xl border border-[var(--border-soft)] p-6 sm:p-8">
+          <p className="text-[var(--text-muted)] text-sm sm:text-base leading-relaxed mb-6">
+            CoralSend uses a signaling server only to help your browser connect to the other person&apos;s browser.
+            Room IDs and connection metadata pass through the server; <strong className="text-[var(--text-primary)]">file
+            bytes never do</strong>. Once the WebRTC data channel is open, files are sent directly between devices and
+            are encrypted in transit (DTLS).
+          </p>
+          <div className="flex flex-wrap gap-4 text-sm">
+            <span className="inline-flex items-center gap-2 text-[var(--text-muted)]">
+              <Lock className="w-4 h-4 text-[var(--color-accent)]" aria-hidden />
+              End-to-end encrypted
+            </span>
+            <span className="inline-flex items-center gap-2 text-[var(--text-muted)]">
+              <Wifi className="w-4 h-4 text-[var(--color-accent)]" aria-hidden />
+              Direct P2P when possible
+            </span>
+            <span className="inline-flex items-center gap-2 text-[var(--text-muted)]">
+              <FileCheck className="w-4 h-4 text-[var(--color-accent)]" aria-hidden />
+              No server storage
+            </span>
+          </div>
+        </div>
       </section>
 
-      <section className="flex flex-col items-center gap-4 pt-4">
-        <p className="text-[var(--text-muted)] text-xs">v{APP_VERSION}</p>
-        <SocialLinks iconSize={20} />
-        <div className="flex items-center gap-3 text-sm">
-          <Link href="/privacy" className="text-[var(--text-muted)] hover:text-teal-400 transition-colors">
-            Privacy
-          </Link>
-          <span className="text-[var(--text-muted)]">·</span>
-          <Link href="/terms" className="text-[var(--text-muted)] hover:text-teal-400 transition-colors">
-            Terms
-          </Link>
-          <span className="text-[var(--text-muted)]">·</span>
-          <Link href="/acceptable-use" className="text-[var(--text-muted)] hover:text-teal-400 transition-colors">
-            Acceptable use
+      {/* App preview / CTA */}
+      <section
+        className="rounded-2xl border border-[var(--border-soft)] overflow-hidden glass"
+        aria-labelledby="cta-heading"
+      >
+        <div className="p-6 sm:p-8 text-center">
+          <div className="flex justify-center mb-4">
+            <Image
+              src={ASSETS.logo}
+              alt=""
+              width={64}
+              height={64}
+              className="object-contain opacity-90"
+              aria-hidden
+            />
+          </div>
+          <h2 id="cta-heading" className="text-xl font-bold text-[var(--text-primary)] mb-2">
+            Ready to send?
+          </h2>
+          <p className="text-[var(--text-muted)] text-sm sm:text-base mb-6 max-w-md mx-auto">
+            Open the app to create a room, join with a link, or scan a QR code.
+          </p>
+          <Link
+            href="/app"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center gap-2 font-medium rounded-xl px-6 py-3 text-base bg-[var(--color-accent-subtle)] text-[var(--color-accent)] border border-[var(--color-accent-border)] hover:bg-[var(--color-accent-subtle)] hover:border-[var(--color-accent)] transition-colors"
+          >
+            Open App
+            <ArrowRight className="w-4 h-4" aria-hidden />
           </Link>
         </div>
-        <Link href="/changelog" className="text-[var(--text-muted)] hover:text-teal-400 text-sm transition-colors">
+      </section>
+
+      {/* Footer */}
+      <footer className="flex flex-col items-center gap-6 pt-8 border-t border-[var(--border-soft)]">
+        <p className="text-[var(--text-muted)] text-xs">v{APP_VERSION}</p>
+        <SocialLinks iconSize={20} />
+        <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm" aria-label="Legal and info">
+          <Link href="/privacy" className="text-[var(--text-muted)] hover:text-[var(--color-accent-hover)] transition-colors">
+            Privacy
+          </Link>
+          <span className="text-[var(--text-muted)]" aria-hidden>·</span>
+          <Link href="/terms" className="text-[var(--text-muted)] hover:text-[var(--color-accent-hover)] transition-colors">
+            Terms
+          </Link>
+          <span className="text-[var(--text-muted)]" aria-hidden>·</span>
+          <Link href="/acceptable-use" className="text-[var(--text-muted)] hover:text-[var(--color-accent-hover)] transition-colors">
+            Acceptable use
+          </Link>
+        </nav>
+        <Link href="/changelog" className="text-[var(--text-muted)] hover:text-[var(--color-accent-hover)] text-sm transition-colors">
           Changelog
         </Link>
-      </section>
+      </footer>
     </div>
   );
 }

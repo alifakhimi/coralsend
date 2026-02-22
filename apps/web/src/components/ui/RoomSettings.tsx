@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useStore } from '@/store/store';
 import { Button } from './Button';
+import { Switch } from './Switch';
 import {
   Settings,
   X,
@@ -13,6 +14,7 @@ import {
   Shield,
   Copy,
   Check,
+  Terminal,
 } from 'lucide-react';
 
 interface RoomSettingsProps {
@@ -24,6 +26,8 @@ interface RoomSettingsProps {
 export function RoomSettings({ isOpen, onClose, className }: RoomSettingsProps) {
   const currentRoom = useStore((s) => s.currentRoom);
   const setRoomName = useStore((s) => s.setRoomName);
+  const debugEnabled = useStore((s) => s.debugEnabled);
+  const setDebugEnabled = useStore((s) => s.setDebugEnabled);
   
   const [name, setName] = useState(currentRoom?.name || '');
   const [maxMembers, setMaxMembers] = useState(8);
@@ -70,7 +74,7 @@ export function RoomSettings({ isOpen, onClose, className }: RoomSettingsProps) 
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-[var(--border-soft)]">
           <div className="flex items-center gap-2">
-            <Settings className="w-5 h-5 text-teal-400" />
+            <Settings className="w-5 h-5 text-[var(--color-accent)]" />
             <h2 className="font-semibold text-[var(--text-primary)]">Room Settings</h2>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose}>
@@ -85,7 +89,7 @@ export function RoomSettings({ isOpen, onClose, className }: RoomSettingsProps) 
             <label className="block text-sm text-[var(--text-muted)] mb-2">Room Code</label>
             <div className="flex items-center gap-2">
               <div className="flex-1 bg-[var(--surface-glass)] border border-[var(--border-soft)] rounded-lg px-3 py-2">
-                <span className="font-mono text-lg text-teal-400">{currentRoom.id}</span>
+                <span className="font-mono text-lg text-[var(--color-accent)]">{currentRoom.id}</span>
               </div>
               <Button variant="secondary" size="icon" onClick={copyRoomId}>
                 {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
@@ -101,7 +105,7 @@ export function RoomSettings({ isOpen, onClose, className }: RoomSettingsProps) 
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Project Files"
-              className="w-full bg-[var(--surface-glass)] border border-[var(--border-soft)] rounded-lg px-3 py-2 text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+              className="w-full bg-[var(--surface-glass)] border border-[var(--border-soft)] rounded-lg px-3 py-2 text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] focus:border-[var(--color-accent)]"
             />
           </div>
 
@@ -119,7 +123,7 @@ export function RoomSettings({ isOpen, onClose, className }: RoomSettingsProps) 
                   className={cn(
                     'flex-1 py-2 rounded-lg text-sm font-medium transition-colors',
                     maxMembers === num
-                      ? 'bg-teal-500 text-white'
+                      ? 'bg-[var(--color-accent)] text-white'
                       : 'bg-[var(--surface-glass)] text-[var(--text-muted)] hover:bg-[var(--surface-glass-strong)]'
                   )}
                 >
@@ -146,7 +150,7 @@ export function RoomSettings({ isOpen, onClose, className }: RoomSettingsProps) 
                   className={cn(
                     'py-2 rounded-lg text-sm font-medium transition-colors',
                     autoExpire === opt.value
-                      ? 'bg-teal-500 text-white'
+                      ? 'bg-[var(--color-accent)] text-white'
                       : 'bg-[var(--surface-glass)] text-[var(--text-muted)] hover:bg-[var(--surface-glass-strong)]'
                   )}
                 >
@@ -165,26 +169,25 @@ export function RoomSettings({ isOpen, onClose, className }: RoomSettingsProps) 
                 <p className="text-xs text-[var(--text-muted)]">New members must be approved</p>
               </div>
             </div>
-            <button
-              onClick={() => setRequireApproval(!requireApproval)}
-              className={cn(
-                'w-12 h-6 rounded-full transition-colors relative',
-                requireApproval ? 'bg-teal-500' : 'bg-[var(--text-muted)]'
-              )}
-            >
-              <span
-                className={cn(
-                  'absolute top-1 w-4 h-4 bg-white rounded-full transition-transform',
-                  requireApproval ? 'translate-x-7' : 'translate-x-1'
-                )}
-              />
-            </button>
+            <Switch checked={requireApproval} onChange={setRequireApproval} />
+          </div>
+
+          {/* Debug Console */}
+          <div className="flex items-center justify-between glass rounded-lg p-3">
+            <div className="flex items-center gap-2">
+              <Terminal className="w-4 h-4 text-[var(--text-muted)]" />
+              <div>
+                <p className="text-sm text-[var(--text-primary)]">Debug Console</p>
+                <p className="text-xs text-[var(--text-muted)]">Show logs for power users (Ctrl+Shift+D)</p>
+              </div>
+            </div>
+            <Switch checked={debugEnabled} onChange={setDebugEnabled} />
           </div>
 
           {/* Security note */}
           <div className="glass rounded-lg p-3 border border-[var(--border-soft)]">
             <div className="flex items-start gap-2">
-              <Lock className="w-4 h-4 text-teal-400 flex-shrink-0 mt-0.5" />
+              <Lock className="w-4 h-4 text-[var(--color-accent)] flex-shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm text-[var(--text-primary)]">End-to-End Encrypted</p>
                 <p className="text-xs text-[var(--text-muted)]">

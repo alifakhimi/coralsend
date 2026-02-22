@@ -22,8 +22,8 @@ export function MemberAvatar({ member, size = 'md', showStatus = true, statusOve
   };
 
   const statusColors = {
-    online: 'bg-teal-500',
-    offline: 'bg-slate-500',
+    online: 'bg-[var(--color-accent)]',
+    offline: 'bg-[var(--text-muted)]',
     connecting: 'bg-yellow-500',
   };
 
@@ -37,7 +37,7 @@ export function MemberAvatar({ member, size = 'md', showStatus = true, statusOve
         className={cn(
           'rounded-full flex items-center justify-center font-bold text-white',
           sizes[size],
-          member.isMe && showStatus && 'ring-2 ring-teal-400'
+          member.isMe && showStatus && 'ring-2 ring-[var(--color-accent)]'
         )}
         style={{ backgroundColor: bgColor }}
         title={`${member.displayName} (${status})`}

@@ -35,10 +35,9 @@ export function Step2Share({ room, onNext, onSkipDemo }: Step2ShareProps) {
           text: `Join my room to receive files: ${room.id}`,
           url: shareUrl,
         });
-      } catch (err) {
-        if ((err as Error).name !== 'AbortError') {
-          copyLink();
-        }
+      } catch {
+        // Share cancelled (AbortError) or failed — copy link as fallback
+        copyLink();
       }
     } else {
       copyLink();
@@ -64,7 +63,7 @@ export function Step2Share({ room, onNext, onSkipDemo }: Step2ShareProps) {
           </div>
           <div className="flex-1 space-y-3 w-full min-w-0">
             <p className="text-sm text-[var(--text-muted)]">Room code</p>
-            <p className="text-xl font-mono font-bold text-teal-400 break-all">{room.id}</p>
+            <p className="text-xl font-mono font-bold text-[var(--color-accent)] break-all">{room.id}</p>
             <div className="flex flex-wrap gap-2">
               <Button variant="secondary" size="sm" onClick={copyLink}>
                 {copySuccess ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
@@ -88,7 +87,7 @@ export function Step2Share({ room, onNext, onSkipDemo }: Step2ShareProps) {
           {otherMembersCount === 0 ? (
             <span className="text-[var(--text-muted)] text-sm">Waiting for someone to join…</span>
           ) : (
-            <span className="text-teal-400 text-sm">{otherMembersCount} other member{otherMembersCount !== 1 ? 's' : ''} joined</span>
+            <span className="text-[var(--color-accent)] text-sm">{otherMembersCount} other member{otherMembersCount !== 1 ? 's' : ''} joined</span>
           )}
         </div>
       </Card>

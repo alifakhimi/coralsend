@@ -6,6 +6,7 @@ import { useWebRTC } from '@/hooks/useWebRTC';
 import { useStore } from '@/store/store';
 import { extractRoomId, isValidUUID } from '@/lib/utils';
 import { RoomView } from '@/components/views/RoomView';
+import { DebugPanel } from '@/components/ui/DebugPanel';
 
 export default function RoomPage() {
   const params = useParams();
@@ -13,7 +14,17 @@ export default function RoomPage() {
   const roomId = params.id as string;
   const normalizedRoomId = extractRoomId(roomId) || roomId.toUpperCase();
   
-  const { shareFile, requestFile, cancelFileDownload, sendChat, cleanup, connect, retryConnection, copyTextFile } = useWebRTC();
+  const {
+    shareFile,
+    requestFile,
+    requestFileMetaSync,
+    cancelFileDownload,
+    sendChat,
+    cleanup,
+    connect,
+    retryConnection,
+    copyTextFile,
+  } = useWebRTC();
   const currentRoom = useStore((s) => s.currentRoom);
   const status = useStore((s) => s.status);
   
@@ -76,17 +87,17 @@ export default function RoomPage() {
 
   if (!currentRoom || currentRoom.id !== normalizedRoomId) {
     return (
-      <div className="page-shell flex items-center justify-center">
+      <div className="page-shell safe-area flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-400 mx-auto mb-4"></div>
-          <p className="text-slate-400">Connecting to room...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-accent)] mx-auto mb-4"></div>
+          <p className="text-[var(--text-muted)]">Connecting to room...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <main className="page-shell overflow-hidden w-full max-w-2xl mx-auto min-h-dvh">
+    <main className="page-shell safe-area overflow-hidden w-full max-w-2xl mx-auto min-h-dvh">
       <div className="page-glow" />
 
       <div className="relative z-10">
@@ -98,8 +109,10 @@ export default function RoomPage() {
           onSendChat={sendChat}
           onRetryConnection={retryConnection}
           onCopyTextFile={copyTextFile}
+          onRequestFileMetaSync={requestFileMetaSync}
         />
       </div>
+      <DebugPanel />
     </main>
   );
 }

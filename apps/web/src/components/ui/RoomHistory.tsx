@@ -55,7 +55,7 @@ export function RoomHistory({ onRejoin, className }: RoomHistoryProps) {
             variant="ghost"
             size="sm"
             onClick={() => setShowConfirm(true)}
-            className="text-[var(--text-muted)] hover:text-red-400"
+            className="text-[var(--text-muted)] hover:text-[var(--color-error)]"
           >
             <Trash2 className="w-3 h-3" />
             Clear
@@ -82,7 +82,7 @@ export function RoomHistory({ onRejoin, className }: RoomHistoryProps) {
                 clearHistory();
                 setShowConfirm(false);
               }}
-              className="bg-red-500 hover:bg-red-600"
+              className="bg-[var(--color-error)] hover:brightness-90"
             >
               Clear All
             </Button>
@@ -99,7 +99,7 @@ export function RoomHistory({ onRejoin, className }: RoomHistoryProps) {
             onClick={() => onRejoin(room.id)}
           >
             {/* Room icon */}
-            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-[var(--surface-glass-strong)] rounded-md sm:rounded-lg flex items-center justify-center text-xs sm:text-sm font-bold text-teal-400">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-[var(--surface-glass-strong)] rounded-md sm:rounded-lg flex items-center justify-center text-xs sm:text-sm font-bold text-[var(--color-accent)]">
               {room.id.slice(0, 2)}
             </div>
 
@@ -111,7 +111,7 @@ export function RoomHistory({ onRejoin, className }: RoomHistoryProps) {
                   <span className="text-xs text-[var(--text-muted)] truncate">({room.name})</span>
                 )}
               </div>
-              <div className="flex items-center gap-2 text-[10px] sm:text-xs text-[var(--text-muted)]">
+                <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
                 <span className="flex items-center gap-0.5 sm:gap-1">
                   <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                   {formatDate(room.joinedAt)}
@@ -130,7 +130,7 @@ export function RoomHistory({ onRejoin, className }: RoomHistoryProps) {
                   e.stopPropagation();
                   removeFromHistory(room.id);
                 }}
-                className="p-1 sm:p-1.5 text-[var(--text-muted)] hover:text-red-400 transition-colors"
+                className="p-1 sm:p-1.5 text-[var(--text-muted)] hover:text-[var(--color-error)] transition-colors"
               >
                 <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </button>

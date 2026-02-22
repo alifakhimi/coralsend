@@ -13,7 +13,7 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
       default: 'glass',
       elevated: 'glass-strong shadow-xl',
       bordered: 'glass border border-[var(--border-soft)]',
-      glow: 'glass border border-teal-500/30 shadow-lg shadow-teal-500/10',
+      glow: 'glass border border-[var(--color-accent-border)] shadow-lg shadow-[var(--color-accent-border)]',
     };
 
     return (

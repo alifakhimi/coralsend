@@ -10,6 +10,10 @@ export const ASSETS = {
   icon512: '/icon-512.png',
   iconMaskable192: '/icon-maskable-192.png',
   iconMaskable512: '/icon-maskable-512.png',
+  pwaIcon192: '/pwa-icon-192.png',
+  pwaIcon512: '/pwa-icon-512.png',
+  pwaIconMaskable192: '/pwa-icon-maskable-192.png',
+  pwaIconMaskable512: '/pwa-icon-maskable-512.png',
   manifest: '/manifest.json',
 } as const;
 

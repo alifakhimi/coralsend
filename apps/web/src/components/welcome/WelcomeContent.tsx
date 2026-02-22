@@ -114,6 +114,8 @@ export function WelcomeContent() {
           </p>
           <Link
             href="/app"
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center justify-center gap-2 font-medium rounded-xl px-6 py-3 text-base bg-teal-500/20 text-teal-400 border border-teal-500/30 hover:bg-teal-500/30 hover:border-teal-500/50 transition-colors"
           >
             Open App

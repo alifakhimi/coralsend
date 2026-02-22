@@ -30,7 +30,7 @@ export function WelcomeView() {
           >
             <Logo size="sm" className="pointer-events-none" />
           </Link>
-          <Link href="/app" className={cn(openAppBtn)}>
+          <Link href="/app" target="_blank" rel="noopener noreferrer" className={cn(openAppBtn)}>
             <Sparkles className="w-4 h-4" aria-hidden />
             Open App
             <ArrowRight className="w-3.5 h-3.5" aria-hidden />
@@ -80,6 +80,8 @@ export function WelcomeView() {
             Already have a room?{' '}
             <Link
               href="/app"
+              target="_blank"
+              rel="noopener noreferrer"
               className="font-medium text-teal-400 hover:text-teal-300 transition-colors underline underline-offset-2"
             >
               Open App

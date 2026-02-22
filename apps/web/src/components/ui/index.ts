@@ -15,7 +15,7 @@ export { Chat, ChatMessages, ChatInput } from './Chat';
 export type { ChatMessage } from './Chat';
 export { RoomSettings } from './RoomSettings';
 export { SocialLinks } from './SocialLinks';
-export { CreateRoomButton } from './CreateRoomButton';
+export { ActionCard } from './ActionCard';
 export { ThemeToggle } from './ThemeToggle';
 export { Switch } from './Switch';
 export { ActionButton } from './ActionButton';

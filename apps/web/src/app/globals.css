@@ -252,11 +252,40 @@ body {
   outline-offset: 2px;
 }
 
-/* Navigation / clickable: hand cursor like web links */
+/* ─── Cursor (Design System) ─────────────────────────────────────────────
+ * Standard behaviour for mouse cursor across the app:
+ *
+ * • pointer (hand): Any element that triggers navigation or primary action
+ *   — Links (a[href]), buttons, icon buttons, clickable cards, [role="button"]
+ *   — Use so users know "this is clickable like a link"
+ *
+ * • not-allowed: Disabled interactive elements (buttons, controls)
+ *   — Use disabled:cursor-not-allowed on Button, ActionButton, Switch, etc.
+ *   — Signals "action not available" without looking clickable
+ *
+ * • default (arrow): Non-interactive content (text, static layout, images)
+ *   — No need to set; avoid pointer on non-clickable areas to prevent confusion
+ *
+ * • text (I-beam): Text inputs and textareas — browser default; don’t override
+ *
+ * • grab / grabbing: Optional for draggable UI (e.g. reorder lists, panels)
+ *   — Use cursor-grab normally, cursor-grabbing while dragging
+ *
+ * • wait: Optional for full-page or blocking loading (e.g. cursor-wait on body)
+ *   — Prefer inline spinners over global wait cursor when possible
+ *
+ * Rules: (1) All navigation/click targets → pointer. (2) All disabled controls → not-allowed.
+ * ───────────────────────────────────────────────────────────────────────── */
+
 a[href],
 button:not(:disabled),
 [role="button"]:not([aria-disabled="true"]) {
   cursor: pointer;
+}
+
+button:disabled,
+[role="button"][aria-disabled="true"] {
+  cursor: not-allowed;
 }
 
 /* ─── Animations ─── */

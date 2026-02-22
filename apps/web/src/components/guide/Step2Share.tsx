@@ -35,10 +35,9 @@ export function Step2Share({ room, onNext, onSkipDemo }: Step2ShareProps) {
           text: `Join my room to receive files: ${room.id}`,
           url: shareUrl,
         });
-      } catch (err) {
-        if ((err as Error).name !== 'AbortError') {
-          copyLink();
-        }
+      } catch {
+        // Share cancelled (AbortError) or failed — copy link as fallback
+        copyLink();
       }
     } else {
       copyLink();

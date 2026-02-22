@@ -302,7 +302,7 @@ function FileItem({
             'inline-flex flex-col items-center justify-center gap-1',
             'rounded-none rounded-r-xl border-l transition-colors',
             'focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:ring-inset',
-            'disabled:cursor-default',
+            'cursor-pointer',
             isCompleted
               ? 'bg-[var(--color-accent-subtle)] text-[var(--color-accent)] border-[var(--color-accent-border)]'
               : isError

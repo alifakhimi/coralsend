@@ -9,12 +9,13 @@ import {
   Logo,
   Card,
   RoomHistory,
-  CreateRoomButton,
+  ActionCard,
   SocialLinks,
   ThemeToggle,
 } from '@/components/ui';
 import { APP_VERSION } from '@/lib/constants';
 import {
+  Plus,
   QrCode,
   User,
   Globe,
@@ -90,45 +91,27 @@ export function HomeView({ onCreateRoom, onJoinRoom, onPasteLink }: HomeViewProp
 
           {/* Actions */}
           <div className="space-y-3 animate-in fade-in duration-200">
-            <CreateRoomButton onClick={onCreateRoom} />
-
-            {/* Join Room — links to /app/join */}
-            <Link href="/app/join" className="block w-full group">
-              <Card variant="bordered" className="p-4 sm:p-5 hover:border-[var(--color-accent-border)] transition-all">
-                <div className="flex items-center gap-3 sm:gap-4">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 bg-[var(--surface-glass-strong)] rounded-lg sm:rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <QrCode className="w-6 h-6 sm:w-7 sm:h-7 text-[var(--color-accent)]" />
-                  </div>
-                  <div className="text-left">
-                    <h3 className="text-lg sm:text-xl font-semibold text-[var(--text-primary)]">
-                      Join Room
-                    </h3>
-                    <p className="text-[var(--text-muted)] text-xs sm:text-sm">
-                      Scan QR code, paste link, or enter code
-                    </p>
-                  </div>
-                </div>
-              </Card>
-            </Link>
-
-            {/* Getting Started */}
-            <Link href="/guide" className="block w-full group">
-              <Card variant="bordered" className="p-4 sm:p-5 hover:border-[var(--color-accent-border)] transition-all">
-                <div className="flex items-center gap-3 sm:gap-4">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 bg-[var(--surface-glass-strong)] rounded-lg sm:rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Rocket className="w-6 h-6 sm:w-7 sm:h-7 text-[var(--color-accent)]" />
-                  </div>
-                  <div className="text-left">
-                    <h3 className="text-lg sm:text-xl font-semibold text-[var(--text-primary)]">
-                      Getting Started
-                    </h3>
-                    <p className="text-[var(--text-muted)] text-xs sm:text-sm">
-                      Step-by-step guide to share files
-                    </p>
-                  </div>
-                </div>
-              </Card>
-            </Link>
+            <ActionCard
+              variant="highlight"
+              icon={Plus}
+              title="Create Room"
+              description="Start a new sharing session"
+              onClick={onCreateRoom}
+            />
+            <ActionCard
+              variant="default"
+              icon={QrCode}
+              title="Join Room"
+              description="Scan QR code, paste link, or enter code"
+              href="/app/join"
+            />
+            <ActionCard
+              variant="default"
+              icon={Rocket}
+              title="Getting Started"
+              description="Step-by-step guide to share files"
+              href="/guide"
+            />
 
             {/* Room History */}
             <RoomHistory onRejoin={handleJoinRoom} />

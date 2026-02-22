@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useStore, type FileMetadata } from '@/store/store';
+import { useToastStore } from '@/store/toast';
 import { getBaseUrl } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import {
@@ -62,6 +63,7 @@ export function RoomView({
   onRequestFileMetaSync,
 }: RoomViewProps) {
   const currentRoom = useStore((s) => s.currentRoom);
+  const showToast = useToastStore((s) => s.showToast);
   const removeFile = useStore((s) => s.removeFile);
   const removeFiles = useStore((s) => s.removeFiles);
   const clearFilesByDirection = useStore((s) => s.clearFilesByDirection);
@@ -187,6 +189,27 @@ export function RoomView({
       setTimeout(() => setCopiedField(null), 1800);
     } catch (err) {
       console.error('Failed to copy:', err);
+    }
+  };
+
+  // Share: use Web Share API if available, else copy link and show toast.
+  // On any share failure (including AbortError when user cancels), fall back to copy.
+  const handleShareLink = async () => {
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({
+          title: 'CoralSend Room',
+          text: `Join my room to receive files: ${currentRoom?.id ?? ''}`,
+          url: shareUrl,
+        });
+      } catch {
+        // Share cancelled (AbortError) or failed — copy link as fallback
+        await copyValue(shareUrl, 'link');
+        showToast('Link copied');
+      }
+    } else {
+      await copyValue(shareUrl, 'link');
+      showToast('Link copied');
     }
   };
 
@@ -624,11 +647,11 @@ export function RoomView({
 
             <Button
               variant="secondary"
-              onClick={() => copyValue(shareUrl, 'link')}
+              onClick={handleShareLink}
               className="w-full"
             >
-              {copiedField === 'link' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-              {copiedField === 'link' ? 'Copied!' : 'Copy Link'}
+              {copiedField === 'link' ? <Check className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
+              {copiedField === 'link' ? 'Link copied' : 'Share'}
             </Button>
           </div>
         </div>

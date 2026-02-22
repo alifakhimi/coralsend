@@ -1,7 +1,7 @@
 'use client';
 
-import { CreateRoomButton } from '@/components/ui/CreateRoomButton';
-import { Users } from 'lucide-react';
+import { ActionCard } from '@/components/ui';
+import { Plus, Users } from 'lucide-react';
 
 interface Step1RoomProps {
   onCreateRoom: () => void;
@@ -21,7 +21,13 @@ export function Step1Room({ onCreateRoom }: Step1RoomProps) {
       </div>
       <div className="space-y-2">
         <p className="text-[var(--text-muted)] text-xs text-center">Click the button below to create your room</p>
-        <CreateRoomButton onClick={onCreateRoom} />
+        <ActionCard
+          variant="highlight"
+          icon={Plus}
+          title="Create Room"
+          description="Start a new sharing session"
+          onClick={onCreateRoom}
+        />
       </div>
     </div>
   );

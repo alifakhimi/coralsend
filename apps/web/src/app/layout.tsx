@@ -1,8 +1,21 @@
 import type { Metadata, Viewport } from 'next';
+import { DM_Sans, JetBrains_Mono } from 'next/font/google';
 import { ASSETS } from '@/lib/constants';
 import { getSiteUrl } from '@/lib/site';
 import { PWAProvider } from '@/components/PWAProvider';
 import './globals.css';
+
+const dmSans = DM_Sans({
+  subsets: ['latin'],
+  variable: '--font-dm-sans',
+  display: 'swap',
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-jetbrains-mono',
+  display: 'swap',
+});
 
 const siteUrl = getSiteUrl();
 
@@ -65,6 +78,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   themeColor: '#0f172a',
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({
@@ -73,7 +87,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={`${dmSans.variable} ${jetbrainsMono.variable}`}>
       <head>
         <script
           dangerouslySetInnerHTML={{

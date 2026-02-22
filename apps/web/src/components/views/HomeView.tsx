@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { useStore } from '@/store/store';
+import { useToastStore } from '@/store/toast';
 import { getShortName } from '@/lib/deviceId';
 import {
   Logo,
@@ -15,8 +16,6 @@ import {
 import { APP_VERSION } from '@/lib/constants';
 import {
   QrCode,
-  AlertCircle,
-  X,
   User,
   Globe,
   Rocket,
@@ -32,13 +31,18 @@ export function HomeView({ onCreateRoom, onJoinRoom, onPasteLink }: HomeViewProp
   const deviceId = useStore((s) => s.deviceId);
   const error = useStore((s) => s.error);
   const pendingShareFiles = useStore((s) => s.pendingShareFiles);
-  const [linkError, setLinkError] = useState<string | null>(null);
+  const showToast = useToastStore((s) => s.showToast);
+
+  useEffect(() => {
+    if (error) {
+      showToast(error, 'error');
+      useStore.getState().setError(null);
+    }
+  }, [error, showToast]);
 
   const handleJoinRoom = (roomIdOrUrl: string) => {
     onJoinRoom(roomIdOrUrl);
   };
-
-  const visibleError = linkError || error;
 
   return (
     <div className="h-dvh flex flex-col animate-in fade-in duration-300">
@@ -51,15 +55,15 @@ export function HomeView({ onCreateRoom, onJoinRoom, onPasteLink }: HomeViewProp
             {deviceId && (
               <div className="flex items-center gap-2 glass border border-[var(--border-soft)] rounded-full py-1 pl-2.5 pr-3">
                 <div className="flex flex-col items-start leading-tight">
-                  <span className="text-[9px] uppercase tracking-wider text-[var(--text-muted)] font-bold">
+                  <span className="text-xs uppercase tracking-wider text-[var(--text-muted)] font-bold">
                     My Device
                   </span>
                   <span className="text-xs font-semibold text-[var(--text-primary)]">
                     {getShortName(deviceId)}
                   </span>
                 </div>
-                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-teal-500/20 to-cyan-500/20 border border-teal-500/30 flex items-center justify-center">
-                  <User className="w-3.5 h-3.5 text-teal-400" />
+                <div className="w-7 h-7 rounded-full bg-[var(--color-accent-subtle)] border border-[var(--color-accent-border)] flex items-center justify-center">
+                  <User className="w-3.5 h-3.5 text-[var(--color-accent)]" />
                 </div>
               </div>
             )}
@@ -75,26 +79,10 @@ export function HomeView({ onCreateRoom, onJoinRoom, onPasteLink }: HomeViewProp
             Secure peer-to-peer file sharing
           </p>
 
-          {/* Error */}
-          {visibleError && (
-            <div className="flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/5 p-3">
-              <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
-              <p className="flex-1 text-sm text-red-400">{visibleError}</p>
-              <button
-                onClick={() => {
-                  setLinkError(null);
-                  useStore.getState().setError(null);
-                }}
-              >
-                <X className="w-4 h-4 text-red-400" />
-              </button>
-            </div>
-          )}
-
           {/* Pending share files */}
           {pendingShareFiles.length > 0 && (
-            <Card variant="bordered" className="border-teal-500/30 bg-teal-500/5 p-3">
-              <p className="text-teal-400 text-sm">
+            <Card variant="bordered" className="border-[var(--color-accent-border)] bg-[var(--color-accent-subtle)] p-3">
+              <p className="text-[var(--color-accent)] text-sm">
                 You have {pendingShareFiles.length} file{pendingShareFiles.length !== 1 ? 's' : ''} to share. Create or join a room to send them.
               </p>
             </Card>
@@ -106,10 +94,10 @@ export function HomeView({ onCreateRoom, onJoinRoom, onPasteLink }: HomeViewProp
 
             {/* Join Room — links to /app/join */}
             <Link href="/app/join" className="block w-full group">
-              <Card variant="bordered" className="p-4 sm:p-5 hover:border-cyan-500/30 transition-all">
+              <Card variant="bordered" className="p-4 sm:p-5 hover:border-[var(--color-accent-border)] transition-all">
                 <div className="flex items-center gap-3 sm:gap-4">
                   <div className="w-12 h-12 sm:w-14 sm:h-14 bg-[var(--surface-glass-strong)] rounded-lg sm:rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <QrCode className="w-6 h-6 sm:w-7 sm:h-7 text-cyan-400" />
+                    <QrCode className="w-6 h-6 sm:w-7 sm:h-7 text-[var(--color-accent)]" />
                   </div>
                   <div className="text-left">
                     <h3 className="text-lg sm:text-xl font-semibold text-[var(--text-primary)]">
@@ -125,10 +113,10 @@ export function HomeView({ onCreateRoom, onJoinRoom, onPasteLink }: HomeViewProp
 
             {/* Getting Started */}
             <Link href="/guide" className="block w-full group">
-              <Card variant="bordered" className="p-4 sm:p-5 hover:border-teal-500/30 transition-all">
+              <Card variant="bordered" className="p-4 sm:p-5 hover:border-[var(--color-accent-border)] transition-all">
                 <div className="flex items-center gap-3 sm:gap-4">
                   <div className="w-12 h-12 sm:w-14 sm:h-14 bg-[var(--surface-glass-strong)] rounded-lg sm:rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Rocket className="w-6 h-6 sm:w-7 sm:h-7 text-teal-400" />
+                    <Rocket className="w-6 h-6 sm:w-7 sm:h-7 text-[var(--color-accent)]" />
                   </div>
                   <div className="text-left">
                     <h3 className="text-lg sm:text-xl font-semibold text-[var(--text-primary)]">
@@ -149,18 +137,18 @@ export function HomeView({ onCreateRoom, onJoinRoom, onPasteLink }: HomeViewProp
       </div>
 
       {/* Footer */}
-      <footer className="flex-shrink-0 py-3 px-4 flex flex-col items-center gap-2 text-[var(--text-muted)] text-[10px] sm:text-xs">
-        <p>Files are transferred directly between devices</p>
-        <div className="flex items-center gap-3 flex-wrap justify-center">
+      <footer className="flex-shrink-0 py-4 px-4 flex flex-col items-center gap-3 text-[var(--text-muted)]">
+        <p className="text-sm">Files are transferred directly between devices</p>
+        <div className="flex items-center gap-3 flex-wrap justify-center text-xs">
           <span>v{APP_VERSION}</span>
           <SocialLinks iconSize={16} />
           <Link
             href="/"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 hover:text-teal-400 transition-colors"
+            className="inline-flex items-center gap-1 hover:text-[var(--color-accent-hover)] transition-colors"
           >
-            <Globe className="w-3 h-3" />
+            <Globe className="w-3.5 h-3.5" />
             Website
           </Link>
         </div>

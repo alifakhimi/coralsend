@@ -87,17 +87,17 @@ export default function RoomPage() {
 
   if (!currentRoom || currentRoom.id !== normalizedRoomId) {
     return (
-      <div className="page-shell flex items-center justify-center">
+      <div className="page-shell safe-area flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-400 mx-auto mb-4"></div>
-          <p className="text-slate-400">Connecting to room...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-accent)] mx-auto mb-4"></div>
+          <p className="text-[var(--text-muted)]">Connecting to room...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <main className="page-shell overflow-hidden w-full max-w-2xl mx-auto min-h-dvh">
+    <main className="page-shell safe-area overflow-hidden w-full max-w-2xl mx-auto min-h-dvh">
       <div className="page-glow" />
 
       <div className="relative z-10">

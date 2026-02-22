@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sun, Moon } from 'lucide-react';
+import { Sun, Moon, Monitor } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const STORAGE_KEY = 'coralsend_theme';
@@ -35,22 +35,25 @@ function applyTheme(stored: Theme, resolved: 'light' | 'dark') {
 }
 
 export function ThemeToggle({ className }: { className?: string }) {
+  const [mode, setMode] = useState<Theme>(() => getStoredTheme());
   const [resolved, setResolved] = useState<'light' | 'dark'>(() => getResolvedTheme());
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+    const stored = getStoredTheme();
     const r = getResolvedTheme();
+    setMode(stored);
     setResolved(r);
-    applyTheme(getStoredTheme(), r);
+    applyTheme(stored, r);
   }, []);
 
   useEffect(() => {
     if (!mounted) return;
     const mq = window.matchMedia('(prefers-color-scheme: light)');
     const handler = () => {
-      const stored = getStoredTheme();
-      if (stored === 'system') {
+      const currentStored = getStoredTheme();
+      if (currentStored === 'system') {
         const next = getSystemTheme();
         setResolved(next);
         applyTheme('system', next);
@@ -69,6 +72,7 @@ export function ThemeToggle({ className }: { className?: string }) {
 
     localStorage.setItem(STORAGE_KEY, next);
     const resolvedNext = next === 'system' ? getSystemTheme() : next;
+    setMode(next);
     setResolved(resolvedNext);
     applyTheme(next, resolvedNext);
   };
@@ -91,11 +95,11 @@ export function ThemeToggle({ className }: { className?: string }) {
         'focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 focus:ring-offset-[var(--bg-base)]',
         className
       )}
-      aria-label={`Theme: ${resolved}. Click to cycle`}
-      title={`Theme: ${resolved}. Click to cycle`}
+      aria-label={`Theme: ${mode}. Click to cycle (system → light → dark)`}
+      title={`Theme: ${mode}. Click to cycle (system → light → dark)`}
     >
       <AnimatePresence mode="wait" initial={false}>
-        {resolved === 'dark' ? (
+        {mode === 'dark' ? (
           <motion.div
             key="moon"
             initial={{ opacity: 0, rotate: -90, scale: 0.5 }}
@@ -104,6 +108,16 @@ export function ThemeToggle({ className }: { className?: string }) {
             transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
           >
             <Moon className="w-4 h-4" />
+          </motion.div>
+        ) : mode === 'system' ? (
+          <motion.div
+            key="system"
+            initial={{ opacity: 0, rotate: 90, scale: 0.5 }}
+            animate={{ opacity: 1, rotate: 0, scale: 1 }}
+            exit={{ opacity: 0, rotate: -90, scale: 0.5 }}
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <Monitor className="w-4 h-4" />
           </motion.div>
         ) : (
           <motion.div

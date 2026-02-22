@@ -7,18 +7,18 @@ import { cn } from '@/lib/utils';
 import { Terminal, X, Trash2, ChevronDown } from 'lucide-react';
 
 const CATEGORY_COLORS: Record<LogCategory, string> = {
-  ICE: 'text-cyan-400',
-  Transfer: 'text-teal-400',
+  ICE: 'text-[var(--color-accent)]',
+  Transfer: 'text-[var(--color-accent)]',
   Signaling: 'text-violet-400',
-  DataChannel: 'text-amber-400',
-  General: 'text-slate-400',
+  DataChannel: 'text-[var(--color-warning)]',
+  General: 'text-[var(--text-muted)]',
 };
 
 const LEVEL_COLORS: Record<string, string> = {
-  debug: 'text-slate-500',
-  info: 'text-slate-300',
+  debug: 'text-[var(--text-muted)]',
+  info: 'text-[var(--text-primary)]',
   warn: 'text-yellow-400',
-  error: 'text-red-400',
+  error: 'text-[var(--color-error)]',
 };
 
 function formatTime(ts: number): string {
@@ -70,7 +70,7 @@ export function DebugPanel() {
     return (
       <button
         onClick={toggleOpen}
-        className="fixed bottom-14 left-3 z-40 p-2 rounded-full glass border border-[var(--border-soft)] text-[var(--text-muted)] hover:text-teal-400 transition-colors"
+        className="fixed bottom-14 left-3 z-40 p-2 rounded-full glass border border-[var(--border-soft)] text-[var(--text-muted)] hover:text-[var(--color-accent-hover)] transition-colors"
         title="Debug panel (Ctrl+Shift+D)"
       >
         <Terminal className="w-4 h-4" />
@@ -82,12 +82,12 @@ export function DebugPanel() {
     <div className="fixed inset-x-0 bottom-0 z-50 max-h-[50vh] flex flex-col glass-strong border-t border-[var(--border-soft)] text-xs font-mono">
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[var(--border-soft)] shrink-0">
-        <Terminal className="w-3.5 h-3.5 text-teal-400" />
+        <Terminal className="w-3.5 h-3.5 text-[var(--color-accent)]" />
         <span className="font-semibold text-[var(--text-primary)]">Debug</span>
 
         {/* Connection paths */}
         {members?.filter(m => !m.isMe && m.connectionPath).map(m => (
-          <span key={m.deviceId} className={cn('text-[10px] px-1.5 py-0.5 rounded', m.connectionPath === 'direct' ? 'text-teal-400 bg-teal-400/10' : 'text-amber-400 bg-amber-400/10')}>
+          <span key={m.deviceId} className={cn('text-xs px-1.5 py-0.5 rounded', m.connectionPath === 'direct' ? 'text-[var(--color-accent)] bg-[var(--color-accent-subtle)]' : 'text-[var(--color-warning)] bg-[color-mix(in_srgb,var(--color-warning)_10%,transparent)]')}>
             {m.displayName}: {m.connectionPath}
           </span>
         ))}
@@ -99,7 +99,7 @@ export function DebugPanel() {
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value as LogCategory | 'all')}
-            className="bg-transparent text-[var(--text-muted)] text-[10px] border border-[var(--border-soft)] rounded px-1.5 py-0.5 appearance-none pr-4 cursor-pointer"
+            className="bg-transparent text-[var(--text-muted)] text-xs border border-[var(--border-soft)] rounded px-1.5 py-0.5 appearance-none pr-4 cursor-pointer"
           >
             <option value="all">All</option>
             <option value="ICE">ICE</option>
@@ -111,7 +111,7 @@ export function DebugPanel() {
           <ChevronDown className="w-2.5 h-2.5 absolute right-0.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none" />
         </div>
 
-        <button onClick={() => logger.clear()} className="text-[var(--text-muted)] hover:text-red-400" title="Clear logs">
+        <button onClick={() => logger.clear()} className="text-[var(--text-muted)] hover:text-[var(--color-error)]" title="Clear logs">
           <Trash2 className="w-3 h-3" />
         </button>
         <button onClick={toggleOpen} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]" title="Close (Ctrl+Shift+D)">

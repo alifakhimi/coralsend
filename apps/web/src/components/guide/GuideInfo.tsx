@@ -38,8 +38,8 @@ export function GuideInfo() {
         <ul className="space-y-3">
           {FEATURES.map(({ icon: Icon, title, description }) => (
             <li key={title} className="flex gap-3">
-              <div className="shrink-0 w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center">
-                <Icon className="w-4 h-4 text-teal-400" />
+              <div className="shrink-0 w-8 h-8 rounded-lg bg-[var(--color-accent-subtle)] flex items-center justify-center">
+                <Icon className="w-4 h-4 text-[var(--color-accent)]" />
               </div>
               <div>
                 <p className="font-medium text-[var(--text-primary)] text-sm">{title}</p>

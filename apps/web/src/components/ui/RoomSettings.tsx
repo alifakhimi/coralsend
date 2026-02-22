@@ -74,7 +74,7 @@ export function RoomSettings({ isOpen, onClose, className }: RoomSettingsProps) 
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-[var(--border-soft)]">
           <div className="flex items-center gap-2">
-            <Settings className="w-5 h-5 text-teal-400" />
+            <Settings className="w-5 h-5 text-[var(--color-accent)]" />
             <h2 className="font-semibold text-[var(--text-primary)]">Room Settings</h2>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose}>
@@ -89,7 +89,7 @@ export function RoomSettings({ isOpen, onClose, className }: RoomSettingsProps) 
             <label className="block text-sm text-[var(--text-muted)] mb-2">Room Code</label>
             <div className="flex items-center gap-2">
               <div className="flex-1 bg-[var(--surface-glass)] border border-[var(--border-soft)] rounded-lg px-3 py-2">
-                <span className="font-mono text-lg text-teal-400">{currentRoom.id}</span>
+                <span className="font-mono text-lg text-[var(--color-accent)]">{currentRoom.id}</span>
               </div>
               <Button variant="secondary" size="icon" onClick={copyRoomId}>
                 {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
@@ -105,7 +105,7 @@ export function RoomSettings({ isOpen, onClose, className }: RoomSettingsProps) 
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Project Files"
-              className="w-full bg-[var(--surface-glass)] border border-[var(--border-soft)] rounded-lg px-3 py-2 text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+              className="w-full bg-[var(--surface-glass)] border border-[var(--border-soft)] rounded-lg px-3 py-2 text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] focus:border-[var(--color-accent)]"
             />
           </div>
 
@@ -123,7 +123,7 @@ export function RoomSettings({ isOpen, onClose, className }: RoomSettingsProps) 
                   className={cn(
                     'flex-1 py-2 rounded-lg text-sm font-medium transition-colors',
                     maxMembers === num
-                      ? 'bg-teal-500 text-white'
+                      ? 'bg-[var(--color-accent)] text-white'
                       : 'bg-[var(--surface-glass)] text-[var(--text-muted)] hover:bg-[var(--surface-glass-strong)]'
                   )}
                 >
@@ -150,7 +150,7 @@ export function RoomSettings({ isOpen, onClose, className }: RoomSettingsProps) 
                   className={cn(
                     'py-2 rounded-lg text-sm font-medium transition-colors',
                     autoExpire === opt.value
-                      ? 'bg-teal-500 text-white'
+                      ? 'bg-[var(--color-accent)] text-white'
                       : 'bg-[var(--surface-glass)] text-[var(--text-muted)] hover:bg-[var(--surface-glass-strong)]'
                   )}
                 >
@@ -187,7 +187,7 @@ export function RoomSettings({ isOpen, onClose, className }: RoomSettingsProps) 
           {/* Security note */}
           <div className="glass rounded-lg p-3 border border-[var(--border-soft)]">
             <div className="flex items-start gap-2">
-              <Lock className="w-4 h-4 text-teal-400 flex-shrink-0 mt-0.5" />
+              <Lock className="w-4 h-4 text-[var(--color-accent)] flex-shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm text-[var(--text-primary)]">End-to-End Encrypted</p>
                 <p className="text-xs text-[var(--text-muted)]">

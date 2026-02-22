@@ -19,3 +19,4 @@ export { CreateRoomButton } from './CreateRoomButton';
 export { ThemeToggle } from './ThemeToggle';
 export { Switch } from './Switch';
 export { ActionButton } from './ActionButton';
+export { ToastContainer } from './Toast';

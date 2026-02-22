@@ -11,8 +11,8 @@ export function Step1Room({ onCreateRoom }: Step1RoomProps) {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <div className="text-center space-y-2">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-teal-500/10 border border-teal-500/30 mb-2">
-          <Users className="w-8 h-8 text-teal-400" />
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[var(--color-accent-subtle)] border border-[var(--color-accent-border)] mb-2">
+          <Users className="w-8 h-8 text-[var(--color-accent)]" />
         </div>
         <h2 className="text-xl font-semibold text-[var(--text-primary)]">Create a room</h2>
         <p className="text-[var(--text-muted)] text-sm max-w-sm mx-auto">

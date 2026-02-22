@@ -49,8 +49,8 @@ export function WelcomeContent() {
         <ul className="space-y-6 sm:space-y-8">
           {FEATURES.map(({ icon: Icon, title, description }) => (
             <li key={title} className="flex gap-4 sm:gap-5">
-              <div className="shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center">
-                <Icon className="w-6 h-6 sm:w-7 sm:h-7 text-teal-400" aria-hidden />
+              <div className="shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[var(--color-accent-subtle)] border border-[var(--color-accent-border)] flex items-center justify-center">
+                <Icon className="w-6 h-6 sm:w-7 sm:h-7 text-[var(--color-accent)]" aria-hidden />
               </div>
               <div>
                 <h3 className="font-semibold text-[var(--text-primary)] text-base sm:text-lg mb-1">{title}</h3>
@@ -75,15 +75,15 @@ export function WelcomeContent() {
           </p>
           <div className="flex flex-wrap gap-4 text-sm">
             <span className="inline-flex items-center gap-2 text-[var(--text-muted)]">
-              <Lock className="w-4 h-4 text-teal-400" aria-hidden />
+              <Lock className="w-4 h-4 text-[var(--color-accent)]" aria-hidden />
               End-to-end encrypted
             </span>
             <span className="inline-flex items-center gap-2 text-[var(--text-muted)]">
-              <Wifi className="w-4 h-4 text-teal-400" aria-hidden />
+              <Wifi className="w-4 h-4 text-[var(--color-accent)]" aria-hidden />
               Direct P2P when possible
             </span>
             <span className="inline-flex items-center gap-2 text-[var(--text-muted)]">
-              <FileCheck className="w-4 h-4 text-teal-400" aria-hidden />
+              <FileCheck className="w-4 h-4 text-[var(--color-accent)]" aria-hidden />
               No server storage
             </span>
           </div>
@@ -116,7 +116,7 @@ export function WelcomeContent() {
             href="/app"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center justify-center gap-2 font-medium rounded-xl px-6 py-3 text-base bg-teal-500/20 text-teal-400 border border-teal-500/30 hover:bg-teal-500/30 hover:border-teal-500/50 transition-colors"
+            className="inline-flex items-center justify-center gap-2 font-medium rounded-xl px-6 py-3 text-base bg-[var(--color-accent-subtle)] text-[var(--color-accent)] border border-[var(--color-accent-border)] hover:bg-[var(--color-accent-subtle)] hover:border-[var(--color-accent)] transition-colors"
           >
             Open App
             <ArrowRight className="w-4 h-4" aria-hidden />
@@ -129,19 +129,19 @@ export function WelcomeContent() {
         <p className="text-[var(--text-muted)] text-xs">v{APP_VERSION}</p>
         <SocialLinks iconSize={20} />
         <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm" aria-label="Legal and info">
-          <Link href="/privacy" className="text-[var(--text-muted)] hover:text-teal-400 transition-colors">
+          <Link href="/privacy" className="text-[var(--text-muted)] hover:text-[var(--color-accent-hover)] transition-colors">
             Privacy
           </Link>
           <span className="text-[var(--text-muted)]" aria-hidden>·</span>
-          <Link href="/terms" className="text-[var(--text-muted)] hover:text-teal-400 transition-colors">
+          <Link href="/terms" className="text-[var(--text-muted)] hover:text-[var(--color-accent-hover)] transition-colors">
             Terms
           </Link>
           <span className="text-[var(--text-muted)]" aria-hidden>·</span>
-          <Link href="/acceptable-use" className="text-[var(--text-muted)] hover:text-teal-400 transition-colors">
+          <Link href="/acceptable-use" className="text-[var(--text-muted)] hover:text-[var(--color-accent-hover)] transition-colors">
             Acceptable use
           </Link>
         </nav>
-        <Link href="/changelog" className="text-[var(--text-muted)] hover:text-teal-400 text-sm transition-colors">
+        <Link href="/changelog" className="text-[var(--text-muted)] hover:text-[var(--color-accent-hover)] text-sm transition-colors">
           Changelog
         </Link>
       </footer>

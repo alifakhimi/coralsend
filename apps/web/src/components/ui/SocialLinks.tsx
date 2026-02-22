@@ -42,7 +42,7 @@ export function SocialLinks({ className, iconSize = 20 }: SocialLinksProps) {
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-slate-400 hover:text-teal-400 transition-colors"
+            className="text-[var(--text-muted)] hover:text-[var(--color-accent-hover)] transition-colors"
             aria-label={LABELS[key]}
           >
             <Icon size={iconSize} className="shrink-0" />

@@ -20,9 +20,9 @@ export function Progress({ value, size = 'md', showLabel = true, className }: Pr
 
   return (
     <div className={cn('w-full', className)}>
-      <div className={cn('w-full bg-slate-700/50 rounded-full overflow-hidden', sizes[size])}>
+      <div className={cn('w-full bg-[var(--bg-surface)] rounded-full overflow-hidden', sizes[size])}>
         <div
-          className="h-full bg-gradient-to-r from-teal-500 to-cyan-500 rounded-full transition-all duration-300 ease-out relative"
+          className="h-full bg-[var(--color-accent)] rounded-full transition-all duration-300 ease-out relative"
           style={{ width: `${clampedValue}%` }}
         >
           {/* Animated shine effect */}
@@ -30,9 +30,9 @@ export function Progress({ value, size = 'md', showLabel = true, className }: Pr
         </div>
       </div>
       {showLabel && (
-        <div className="flex justify-between mt-1.5 text-xs text-slate-400">
+        <div className="flex justify-between mt-1.5 text-xs text-[var(--text-muted)]">
           <span>{clampedValue}%</span>
-          {clampedValue === 100 && <span className="text-teal-400">Complete</span>}
+          {clampedValue === 100 && <span className="text-[var(--color-accent)]">Complete</span>}
         </div>
       )}
     </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { ToastContainer } from '@/components/ui/Toast';
 
 /**
  * Registers the Service Worker for PWA share_target support.
@@ -23,5 +24,10 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
       });
   }, []);
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <ToastContainer />
+    </>
+  );
 }

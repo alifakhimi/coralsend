@@ -41,7 +41,7 @@ export function MemberList({ className, onRetryConnection }: MemberListProps) {
               <span className="font-medium text-[var(--text-primary)] truncate">
                 {myInfo.displayName}
               </span>
-              <span className="text-xs text-teal-400 bg-teal-400/10 px-1.5 py-0.5 rounded">
+              <span className="text-xs text-[var(--color-accent)] bg-[var(--color-accent-subtle)] px-1.5 py-0.5 rounded">
                 You
               </span>
             </div>
@@ -51,7 +51,7 @@ export function MemberList({ className, onRetryConnection }: MemberListProps) {
             className={cn(
               'text-xs px-2 py-0.5 rounded-full whitespace-nowrap shrink-0',
               connectionStatus === 'connected'
-                ? 'text-teal-400 bg-teal-400/10'
+                ? 'text-[var(--color-accent)] bg-[var(--color-accent-subtle)]'
                 : connectionStatus === 'connecting'
                 ? 'text-yellow-400 bg-yellow-400/10'
                 : 'text-[var(--text-muted)] bg-[var(--surface-glass)]'
@@ -77,14 +77,14 @@ export function MemberList({ className, onRetryConnection }: MemberListProps) {
             <div className="flex items-center gap-1 sm:gap-2">
               {member.status === 'online' && member.connectionPath && member.connectionPath !== 'unknown' && (
                 member.connectionPath === 'direct'
-                  ? <Wifi className="w-3 h-3 text-teal-400" aria-label="Direct (LAN)" role="img" />
-                  : <Globe className="w-3 h-3 text-amber-400" aria-label="Via internet (relay)" role="img" />
+                  ? <Wifi className="w-3 h-3 text-[var(--color-accent)]" aria-label="Direct (LAN)" role="img" />
+                  : <Globe className="w-3 h-3 text-[var(--color-warning)]" aria-label="Via internet (relay)" role="img" />
               )}
               <span
                 className={cn(
                   'text-xs px-2 py-0.5 rounded-full whitespace-nowrap',
                   member.status === 'online'
-                    ? 'text-teal-400 bg-teal-400/10'
+                    ? 'text-[var(--color-accent)] bg-[var(--color-accent-subtle)]'
                     : member.status === 'connecting'
                     ? 'text-yellow-400 bg-yellow-400/10'
                     : 'text-[var(--text-muted)] bg-[var(--surface-glass)]'
@@ -98,7 +98,7 @@ export function MemberList({ className, onRetryConnection }: MemberListProps) {
                   variant="ghost"
                   size="sm"
                   onClick={() => onRetryConnection(member.deviceId)}
-                  className="p-1 sm:p-1.5 h-auto text-[var(--text-muted)] hover:text-teal-400"
+                  className="p-1 sm:p-1.5 h-auto text-[var(--text-muted)] hover:text-[var(--color-accent-hover)]"
                   title="Retry connection"
                 >
                   <RefreshCw className="w-3 h-3 sm:w-3.5 sm:h-3.5" />

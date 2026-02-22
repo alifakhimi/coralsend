@@ -19,8 +19,8 @@ const statusConfig: Record<Status, {
   idle: { 
     icon: Wifi, 
     text: 'Ready', 
-    color: 'text-slate-400',
-    bgColor: 'bg-slate-700/50',
+    color: 'text-[var(--text-muted)]',
+    bgColor: 'bg-[var(--bg-surface)]',
   },
   connecting: { 
     icon: Loader2, 
@@ -32,20 +32,20 @@ const statusConfig: Record<Status, {
   connected: { 
     icon: CheckCircle, 
     text: 'Connected', 
-    color: 'text-teal-400',
-    bgColor: 'bg-teal-500/10',
+    color: 'text-[var(--color-accent)]',
+    bgColor: 'bg-[var(--color-accent-subtle)]',
   },
   error: { 
     icon: AlertCircle, 
     text: 'Error', 
-    color: 'text-red-400',
-    bgColor: 'bg-red-500/10',
+    color: 'text-[var(--color-error)]',
+    bgColor: 'bg-[var(--color-error-bg)]',
   },
   disconnected: { 
     icon: WifiOff, 
     text: 'Disconnected', 
-    color: 'text-red-400',
-    bgColor: 'bg-red-500/10',
+    color: 'text-[var(--color-error)]',
+    bgColor: 'bg-[var(--color-error-bg)]',
   },
 };
 

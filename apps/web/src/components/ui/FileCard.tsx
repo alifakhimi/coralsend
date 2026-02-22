@@ -23,17 +23,17 @@ export function FileCard({ file, onRemove, className }: FileCardProps) {
   const cardStatus = getCardStatus();
 
   const statusColors = {
-    pending: 'border-slate-600',
-    transferring: 'border-cyan-500/50',
-    completed: 'border-teal-500/50',
-    error: 'border-red-500/50',
+    pending: 'border-[var(--border-soft)]',
+    transferring: 'border-[var(--color-accent-border)]',
+    completed: 'border-[var(--color-accent-border)]',
+    error: 'border-[var(--color-error-border)]',
   };
 
   const statusIcons = {
     pending: null,
     transferring: null,
-    completed: <CheckCircle className="w-5 h-5 text-teal-400" />,
-    error: <AlertCircle className="w-5 h-5 text-red-400" />,
+    completed: <CheckCircle className="w-5 h-5 text-[var(--color-accent)]" />,
+    error: <AlertCircle className="w-5 h-5 text-[var(--color-error)]" />,
   };
 
   // Map direction
@@ -42,14 +42,14 @@ export function FileCard({ file, onRemove, className }: FileCardProps) {
   return (
     <div
       className={cn(
-        'bg-slate-800/60 rounded-xl p-4 border transition-colors',
+        'bg-[var(--bg-elevated)] rounded-xl p-4 border transition-colors',
         statusColors[cardStatus],
         className
       )}
     >
       <div className="flex items-start gap-3">
         {/* File icon */}
-        <div className="flex-shrink-0 w-12 h-12 bg-slate-700/50 rounded-lg flex items-center justify-center text-2xl">
+        <div className="flex-shrink-0 w-12 h-12 bg-[var(--bg-surface)] rounded-lg flex items-center justify-center text-2xl">
           {getFileIcon(file.type)}
         </div>
 
@@ -61,14 +61,14 @@ export function FileCard({ file, onRemove, className }: FileCardProps) {
             {onRemove && cardStatus !== 'transferring' && (
               <button
                 onClick={onRemove}
-                className="p-1 hover:bg-slate-700 rounded transition-colors"
+                className="p-1 hover:bg-[var(--bg-surface)] rounded transition-colors"
               >
-                <X className="w-4 h-4 text-slate-400" />
+                <X className="w-4 h-4 text-[var(--text-muted)]" />
               </button>
             )}
           </div>
           
-          <p className="text-sm text-slate-400 mt-0.5">
+          <p className="text-sm text-[var(--text-muted)] mt-0.5">
             {formatFileSize(file.size)}
             <span className="mx-2">•</span>
             <span className="capitalize">

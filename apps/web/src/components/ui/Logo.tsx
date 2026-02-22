@@ -36,7 +36,7 @@ export function Logo({ size = 'md', showText = true, className }: LogoProps) {
         <span
           className={cn(
             text,
-            'font-bold tracking-tight bg-gradient-to-r from-teal-400 to-cyan-400 bg-clip-text text-transparent'
+            'font-bold tracking-tight gradient-text'
           )}
         >
           CoralSend

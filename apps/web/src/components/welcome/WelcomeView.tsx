@@ -1,44 +1,47 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight, Sparkles } from 'lucide-react';
-import { Logo } from '@/components/ui';
+import { Logo, ThemeToggle } from '@/components/ui';
 import { WelcomeContent } from './WelcomeContent';
 import { cn } from '@/lib/utils';
 import { CreateRoomCta } from './CreateRoomCta';
 import { ASSETS } from '@/lib/constants';
 
 const primaryBtn =
-  'inline-flex items-center justify-center gap-2 font-medium transition-all duration-200 rounded-xl px-6 py-3 text-base bg-gradient-to-r from-teal-500 to-cyan-500 text-white hover:from-teal-400 hover:to-cyan-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 focus:ring-offset-[var(--bg-base)] shadow-lg shadow-teal-500/25';
+  'inline-flex items-center justify-center gap-2 font-medium transition-all duration-200 rounded-xl px-6 py-3 text-base bg-[var(--color-accent)] text-[var(--color-accent-text)] hover:bg-[var(--color-accent-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:ring-offset-2 focus:ring-offset-[var(--bg-base)] shadow-lg shadow-[var(--color-accent)]/25';
 const secondaryBtn =
-  'inline-flex items-center justify-center gap-2 font-medium transition-all duration-200 rounded-xl px-6 py-3 text-base glass-strong text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] border border-[var(--border-soft)] focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 focus:ring-offset-[var(--bg-base)]';
+  'inline-flex items-center justify-center gap-2 font-medium transition-all duration-200 rounded-xl px-6 py-3 text-base glass-strong text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] border border-[var(--border-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:ring-offset-2 focus:ring-offset-[var(--bg-base)]';
 const openAppBtn =
-  'inline-flex items-center justify-center gap-2 font-medium transition-all duration-200 rounded-xl px-4 py-2.5 text-sm bg-teal-500/15 text-teal-400 border border-teal-500/30 hover:bg-teal-500/25 hover:border-teal-500/50 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:ring-offset-2 focus:ring-offset-[var(--bg-base)]';
+  'inline-flex items-center justify-center gap-2 font-medium transition-all duration-200 rounded-xl px-4 py-2.5 text-sm bg-[var(--color-accent-subtle)] text-[var(--color-accent)] border border-[var(--color-accent-border)] hover:bg-[var(--color-accent-subtle)] hover:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:ring-offset-2 focus:ring-offset-[var(--bg-base)]';
 
 export function WelcomeView() {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header: Logo + Open App CTA */}
-      <header className="sticky top-0 z-20 border-b border-[var(--border-soft)] glass-strong">
+      <header className="fixed inset-x-0 top-0 z-40 border-b border-[var(--border-soft)] glass-strong shadow-[0_2px_16px_rgba(2,6,23,0.08)]">
         <nav
           className="max-w-2xl mx-auto w-full px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between"
           aria-label="Main navigation"
         >
           <Link
             href="/"
-            className="focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:ring-offset-2 focus:ring-offset-[var(--bg-base)] rounded-lg"
+            className="focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:ring-offset-2 focus:ring-offset-[var(--bg-base)] rounded-lg shrink-0"
             aria-label="CoralSend Home"
           >
             <Logo size="sm" className="pointer-events-none" />
           </Link>
-          <Link href="/app" target="_blank" rel="noopener noreferrer" className={cn(openAppBtn)}>
-            <Sparkles className="w-4 h-4" aria-hidden />
-            Open App
-            <ArrowRight className="w-3.5 h-3.5" aria-hidden />
-          </Link>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Link href="/app" target="_blank" rel="noopener noreferrer" className={cn(openAppBtn)}>
+              <Sparkles className="w-4 h-4" aria-hidden />
+              Open App
+              <ArrowRight className="w-3.5 h-3.5" aria-hidden />
+            </Link>
+          </div>
         </nav>
       </header>
 
-      <article className="flex-1 max-w-2xl mx-auto w-full px-4 sm:px-6 py-12 sm:py-16">
+      <article className="flex-1 max-w-2xl mx-auto w-full px-4 sm:px-6 pt-28 sm:pt-32 pb-12 sm:pb-16">
         {/* Hero */}
         <section className="text-center mb-16 sm:mb-20" aria-labelledby="hero-title">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full glass border border-[var(--border-soft)] text-xs font-medium text-[var(--text-muted)] mb-8">
@@ -60,7 +63,7 @@ export function WelcomeView() {
           >
             Send files directly.
             <br />
-            <span className="bg-gradient-to-r from-teal-400 to-cyan-400 bg-clip-text text-transparent">
+            <span className="gradient-text">
               No cloud, no account.
             </span>
           </h1>
@@ -82,7 +85,7 @@ export function WelcomeView() {
               href="/app"
               target="_blank"
               rel="noopener noreferrer"
-              className="font-medium text-teal-400 hover:text-teal-300 transition-colors underline underline-offset-2"
+              className="font-medium text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] transition-colors underline underline-offset-2"
             >
               Open App
             </Link>

@@ -71,9 +71,9 @@ interface FileItemProps {
 function ConnectionPathIcon({ path }: { path?: ConnectionPath }) {
   if (!path || path === 'unknown') return null;
   if (path === 'direct') {
-    return <Wifi className="w-3 h-3 text-teal-400 flex-shrink-0" aria-label="Direct (LAN)" role="img" />;
+    return <Wifi className="w-3 h-3 text-[var(--color-accent)] flex-shrink-0" aria-label="Direct (LAN)" role="img" />;
   }
-  return <Globe className="w-3 h-3 text-amber-400 flex-shrink-0" aria-label="Via internet (relay)" role="img" />;
+  return <Globe className="w-3 h-3 text-[var(--color-warning)] flex-shrink-0" aria-label="Via internet (relay)" role="img" />;
 }
 
 function FileItem({
@@ -111,10 +111,10 @@ function FileItem({
       className={cn(
         'relative overflow-hidden glass rounded-xl p-3 sm:p-4 border transition-all',
         selecting && 'cursor-pointer',
-        selecting && selected && 'ring-1 ring-teal-400/50 border-teal-400/40',
-        isCompleted && 'border-teal-500/30',
-        isDownloading && 'border-cyan-500/30',
-        isError && 'border-red-500/30',
+        selecting && selected && 'ring-1 ring-[var(--color-accent)] border-[var(--color-accent-border)]',
+        isCompleted && 'border-[var(--color-accent-border)]',
+        isDownloading && 'border-[var(--color-accent-border)]',
+        isError && 'border-[var(--color-error-border)]',
         !isCompleted && !isDownloading && !isError && 'border-[var(--border-soft)]'
       )}
     >
@@ -143,7 +143,7 @@ function FileItem({
                 }}
                 className={cn(
                   'flex-shrink-0 rounded-md p-0.5 transition-colors',
-                  selected ? 'text-teal-400' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                  selected ? 'text-[var(--color-accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                 )}
                 aria-label={selected ? 'Deselect file' : 'Select file'}
                 title={selected ? 'Deselect file' : 'Select file'}
@@ -152,7 +152,7 @@ function FileItem({
               </button>
             )}
             <h4 className="font-medium text-[var(--text-primary)] truncate flex-1 text-sm sm:text-base">{file.name}</h4>
-            {isError && <AlertCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-400 flex-shrink-0" />}
+            {isError && <AlertCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[var(--color-error)] flex-shrink-0" />}
             {!selecting && onDelete && (
               <button
                 type="button"
@@ -160,7 +160,7 @@ function FileItem({
                   e.stopPropagation();
                   onDelete(file.id);
                 }}
-                className="p-1 rounded-md text-[var(--text-muted)] hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--color-error)] hover:bg-[var(--color-error-bg)] transition-colors"
                 aria-label="Delete file"
                 title="Delete file"
               >
@@ -184,7 +184,7 @@ function FileItem({
             <div className="flex items-center gap-1">
               {isOutbox ? (
                 <CheckCircle
-                  className="w-3 h-3 text-teal-400"
+                  className="w-3 h-3 text-[var(--color-accent)]"
                   aria-label="File shared successfully"
                 />
               ) : (
@@ -198,7 +198,7 @@ function FileItem({
           {/* Outbox: show who is downloading with per-peer progress */}
           {isOutbox && fileDownloaders.length > 0 && (
             <div className="mt-2 space-y-1.5">
-              <span className="text-[10px] sm:text-xs text-[var(--text-muted)]">Sending to:</span>
+              <span className="text-xs text-[var(--text-muted)]">Sending to:</span>
               <div className="flex flex-wrap gap-2">
                 {fileDownloaders.map((d) => {
                   const progress = downloaderProgress[d.deviceId] ?? 0;
@@ -215,13 +215,13 @@ function FileItem({
                         }}
                       >
                         <div
-                          className="flex h-5 w-10 items-center justify-center rounded-md text-[10px] font-bold text-white"
+                          className="flex h-5 w-10 items-center justify-center rounded-md text-xs font-bold text-white"
                           style={{ backgroundColor: getAvatarColor(d.deviceId) }}
                         >
                           {getInitials(d.deviceId)}
                         </div>
                       </div>
-                      <span className="text-[10px] font-medium text-cyan-500 dark:text-cyan-300">{progress}%</span>
+                      <span className="text-xs font-medium text-[var(--color-accent)]">{progress}%</span>
                     </div>
                   );
                 })}
@@ -234,30 +234,30 @@ function FileItem({
             <div className="mt-2.5">
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-glass-strong)]">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-teal-500 to-cyan-500 transition-[width] duration-500 ease-out relative"
+                  className="h-full rounded-full bg-[var(--color-accent)] transition-[width] duration-500 ease-out relative"
                   style={{ width: `${progressValue}%` }}
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent animate-shimmer [background-size:200%_100%]" />
                 </div>
               </div>
-              <div className="mt-1 flex items-center justify-between text-[10px] sm:text-xs text-[var(--text-muted)]">
+              <div className="mt-1 flex items-center justify-between text-xs text-[var(--text-muted)]">
                 <span className="flex items-center gap-1.5">
                   Downloading
                   {file.speed != null && file.speed > 0 && (
-                    <span className="text-cyan-500 dark:text-cyan-300">{formatSpeed(file.speed)}</span>
+                    <span className="text-[var(--color-accent)]">{formatSpeed(file.speed)}</span>
                   )}
                   {file.eta != null && file.eta > 0 && (
                     <span>{formatEta(file.eta)}</span>
                   )}
                 </span>
-                <span className="font-medium text-cyan-500 dark:text-cyan-300">{progressValue}%</span>
+                <span className="font-medium text-[var(--color-accent)]">{progressValue}%</span>
               </div>
             </div>
           )}
 
           {/* Error message */}
           {isError && (
-            <div className="mt-1 text-xs text-red-400">
+            <div className="mt-1 text-xs text-[var(--color-error)]">
               Download failed. Try again.
             </div>
           )}
@@ -301,15 +301,15 @@ function FileItem({
             'absolute right-0 top-0 bottom-0 w-10 sm:w-12',
             'inline-flex flex-col items-center justify-center gap-1',
             'rounded-none rounded-r-xl border-l transition-colors',
-            'focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-inset',
+            'focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:ring-inset',
             'disabled:cursor-default',
             isCompleted
-              ? 'bg-teal-500/10 text-teal-400 border-teal-500/25'
+              ? 'bg-[var(--color-accent-subtle)] text-[var(--color-accent)] border-[var(--color-accent-border)]'
               : isError
-                ? 'bg-red-500/10 text-red-500 dark:text-red-300 border-red-500/25 hover:bg-red-500/20'
+                ? 'bg-[var(--color-error-bg)] text-[var(--color-error)] border-[var(--color-error-border)] hover:bg-[var(--color-error-bg)]'
                 : isDownloading && onCancelDownload
-                  ? 'bg-red-500/10 text-red-500 dark:text-red-300 border-red-500/25 hover:bg-red-500/20'
-                  : 'bg-gradient-to-b from-teal-500 to-cyan-500 text-white border-teal-400/30 hover:from-teal-400 hover:to-cyan-400'
+                  ? 'bg-[var(--color-error-bg)] text-[var(--color-error)] border-[var(--color-error-border)] hover:bg-[var(--color-error-bg)]'
+                  : 'bg-[var(--color-accent)] text-white border-[var(--color-accent-border)] hover:bg-[var(--color-accent-hover)]'
           )}
           aria-label={isCompleted ? 'Downloaded' : isError ? 'Retry download' : isDownloading && onCancelDownload ? 'Cancel download' : 'Download file'}
           title={isCompleted ? 'Downloaded' : isError ? 'Retry download' : isDownloading && onCancelDownload ? 'Cancel download' : 'Download file'}
@@ -319,7 +319,7 @@ function FileItem({
             : isDownloading && onCancelDownload
               ? <X className="w-4 h-4" />
               : <Download className="w-4 h-4" />}
-          <span className="text-[10px] leading-none">
+          <span className="text-xs leading-none">
             {isCompleted ? 'Done' : isError ? 'Retry' : isDownloading && onCancelDownload ? 'Cancel' : 'Save'}
           </span>
         </button>
@@ -366,7 +366,7 @@ function FilterDropdown({ label, value, options, onChange }: FilterDropdownProps
                 className={cn(
                   'w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors',
                   option.id === value
-                    ? 'bg-teal-500/20 text-teal-400'
+                    ? 'bg-[var(--color-accent-subtle)] text-[var(--color-accent)]'
                     : 'text-[var(--text-primary)] hover:bg-[var(--surface-glass)]'
                 )}
               >
@@ -505,7 +505,7 @@ export function FileList({
       {!hideHeader && (
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Icon className={cn('w-5 h-5', isInbox ? 'text-cyan-400' : 'text-teal-400')} />
+            <Icon className={cn('w-5 h-5', 'text-[var(--color-accent)]')} />
             <h3 className="font-semibold text-[var(--text-primary)]">{title}</h3>
             <span className="text-sm text-[var(--text-muted)]">
               ({filteredFiles.length}{files.length !== filteredFiles.length && ` / ${files.length}`})
@@ -526,7 +526,7 @@ export function FileList({
                 className={cn(
                   'px-2 py-1 text-xs rounded transition-colors capitalize',
                   statusFilter === status
-                    ? 'bg-slate-700 text-white'
+                    ? 'bg-[var(--bg-surface)] text-white'
                     : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                 )}
               >
@@ -603,14 +603,14 @@ export function FileList({
                 <Icon className="w-6 h-6 opacity-40" />
               </div>
               <p className="font-medium text-[var(--text-secondary)]">No files match filters</p>
-              <button onClick={clearFilters} className="mt-3 text-sm text-teal-400 hover:underline">
+              <button onClick={clearFilters} className="mt-3 text-sm text-[var(--color-accent)] hover:underline">
                 Clear filters
               </button>
             </>
           ) : isInbox ? (
             <>
-              <div className="flex items-center justify-center w-14 h-14 mx-auto mb-3 rounded-2xl bg-cyan-500/10 border border-cyan-500/20">
-                <Inbox className="w-6 h-6 text-cyan-400 opacity-70" />
+              <div className="flex items-center justify-center w-14 h-14 mx-auto mb-3 rounded-2xl bg-[var(--color-accent-subtle)] border border-[var(--color-accent-border)]">
+                <Inbox className="w-6 h-6 text-[var(--color-accent)] opacity-70" />
               </div>
               {showTrash ? (
                 <>
@@ -625,7 +625,7 @@ export function FileList({
                   <p className="text-xs mt-1 max-w-[260px] text-center leading-relaxed opacity-70">
                     When someone shares a file, it downloads directly from their device to yours
                   </p>
-                  <div className="flex items-center gap-4 mt-4 text-[10px] uppercase tracking-wider opacity-50">
+                  <div className="flex items-center gap-4 mt-4 text-xs uppercase tracking-wider opacity-50">
                     <span className="flex items-center gap-1"><Shield className="w-3 h-3" /> Encrypted</span>
                     <span className="flex items-center gap-1"><Zap className="w-3 h-3" /> Peer-to-peer</span>
                   </div>
@@ -634,8 +634,8 @@ export function FileList({
             </>
           ) : (
             <>
-              <div className="flex items-center justify-center w-14 h-14 mx-auto mb-3 rounded-2xl bg-teal-500/10 border border-teal-500/20">
-                <Send className="w-6 h-6 text-teal-400 opacity-70" />
+              <div className="flex items-center justify-center w-14 h-14 mx-auto mb-3 rounded-2xl bg-[var(--color-accent-subtle)] border border-[var(--color-accent-border)]">
+                <Send className="w-6 h-6 text-[var(--color-accent)] opacity-70" />
               </div>
               <p className="font-medium text-[var(--text-secondary)]">Share your first file</p>
               <p className="text-xs mt-1 max-w-[260px] text-center leading-relaxed opacity-70">
@@ -647,7 +647,7 @@ export function FileList({
                 {onAddFile && (
                   <button
                     onClick={onAddFile}
-                    className="flex items-center gap-2 text-sm font-medium text-white bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 transition-all px-5 py-2.5 rounded-xl shadow-lg shadow-teal-500/20"
+                    className="flex items-center gap-2 text-sm font-medium text-white bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] transition-all px-5 py-2.5 rounded-xl shadow-lg"
                   >
                     <FileUp className="w-4.5 h-4.5" />
                     Share File
@@ -656,7 +656,7 @@ export function FileList({
                 {onPaste && (
                   <button
                     onClick={onPaste}
-                    className="flex items-center gap-2 text-sm font-medium text-teal-400 hover:text-teal-300 transition-colors px-4 py-2.5 rounded-xl border border-teal-400/25 hover:bg-teal-400/10"
+                    className="flex items-center gap-2 text-sm font-medium text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] transition-colors px-4 py-2.5 rounded-xl border border-[var(--color-accent-border)] hover:bg-[var(--color-accent-subtle)]"
                   >
                     <ClipboardPaste className="w-4 h-4" />
                     Paste
@@ -664,7 +664,7 @@ export function FileList({
                 )}
               </div>
 
-              <p className="text-[10px] mt-4 opacity-40">
+              <p className="text-xs mt-4 opacity-40">
                 or drag & drop files anywhere
               </p>
             </>

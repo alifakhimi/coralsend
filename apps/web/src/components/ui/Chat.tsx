@@ -99,7 +99,7 @@ export function ChatMessages({ messages, className }: { messages: ChatMessage[];
                     className={cn(
                       'px-3 py-2 rounded-2xl text-sm break-words',
                       isMe
-                        ? 'bg-teal-600 text-white rounded-br-md'
+                        ? 'bg-[var(--color-accent)] text-white rounded-br-md'
                         : 'glass-strong text-[var(--text-primary)] rounded-bl-md',
                       msgIdx === 0 && isMe && 'rounded-tr-2xl',
                       msgIdx === 0 && !isMe && 'rounded-tl-2xl'
@@ -149,7 +149,7 @@ export function ChatInput({ onSend }: ChatInputProps) {
         onChange={(e) => setText(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder="Type a message..."
-        className="flex-1 bg-[var(--surface-glass)] border border-[var(--border-soft)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+        className="flex-1 bg-[var(--surface-glass)] border border-[var(--border-soft)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] focus:border-[var(--color-accent)]"
       />
       <Button
         variant="primary"
@@ -177,7 +177,7 @@ export function Chat({ messages, onSend, className }: ChatProps) {
           <MessageSquare className="w-4 h-4 text-[var(--text-muted)]" />
           <span className="font-medium text-[var(--text-primary)] text-sm">Chat</span>
           {unreadCount > 0 && (
-            <span className="bg-teal-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+            <span className="bg-[var(--color-accent)] text-white text-xs px-1.5 py-0.5 rounded-full">
               {unreadCount}
             </span>
           )}

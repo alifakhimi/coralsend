@@ -36,8 +36,8 @@ export function Step3Outbox({ room, onShareFile, onEnterRoom }: Step3OutboxProps
         </p>
       </div>
 
-      <Card variant="bordered" className="p-4 flex items-start gap-3 border-teal-500/20 bg-teal-500/5">
-        <ShieldCheck className="w-5 h-5 text-teal-400 shrink-0 mt-0.5" />
+      <Card variant="bordered" className="p-4 flex items-start gap-3 border-[var(--color-accent-border)] bg-[var(--color-accent-subtle)]">
+        <ShieldCheck className="w-5 h-5 text-[var(--color-accent)] shrink-0 mt-0.5" />
         <div className="text-sm text-[var(--text-primary)]">
           <p className="font-medium text-[var(--text-primary)] mb-1">Private and secure</p>
           <p>Your file is never stored anywhere and is not uploaded to a server. It is sent directly between devices using encrypted P2P transfer.</p>
@@ -48,14 +48,14 @@ export function Step3Outbox({ room, onShareFile, onEnterRoom }: Step3OutboxProps
         <div className="p-4 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Send className="w-5 h-5 text-teal-400" />
+              <Send className="w-5 h-5 text-[var(--color-accent)]" />
               <h3 className="font-semibold text-[var(--text-primary)]">Outbox</h3>
               <span className="text-sm text-[var(--text-muted)]">({outboxCount})</span>
             </div>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-1.5 text-xs font-medium text-teal-400 hover:text-teal-300 transition-colors px-2 py-1 rounded-md hover:bg-teal-400/10"
+              className="flex items-center gap-1.5 text-xs font-medium text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] transition-colors px-2 py-1 rounded-md hover:bg-[var(--color-accent-subtle)]"
               aria-label="Add file"
             >
               <Plus className="w-3.5 h-3.5" />

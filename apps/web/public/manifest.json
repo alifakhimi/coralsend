@@ -1,1 +1,29 @@
-{"name":"CoralSend","short_name":"CoralSend","description":"Secure P2P File Transfer - Transfer files directly between devices","start_url":"/","display":"standalone","background_color":"#0f172a","theme_color":"#0f172a","orientation":"portrait-primary","icons":[{"src":"/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any"},{"src":"/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any"},{"src":"/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any"},{"src":"/icon-maskable-192.png","sizes":"192x192","type":"image/png","purpose":"maskable"},{"src":"/icon-maskable-512.png","sizes":"512x512","type":"image/png","purpose":"maskable"}],"categories":["utilities","productivity"],"shortcuts":[{"name":"Send Files","short_name":"Send","description":"Start sending files","url":"/?action=send","icons":[{"src":"/icon.svg","sizes":"any"}]},{"name":"Receive Files","short_name":"Receive","description":"Start receiving files","url":"/?action=receive","icons":[{"src":"/icon.svg","sizes":"any"}]}],"share_target":{"action":"/?action=share","method":"POST","enctype":"multipart/form-data","params":{"files":[{"name":"files","accept":["image/*","video/*","application/*","*/*"]}]}}}
+{
+  "name": "CoralSend",
+  "short_name": "CoralSend",
+  "description": "Secure P2P File Transfer - Transfer files directly between devices",
+  "start_url": "/app",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {"src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"},
+    {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable"},
+    {"src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ],
+  "categories": ["utilities", "productivity"],
+  "shortcuts": [
+    {"name": "Send Files", "short_name": "Send", "description": "Create room and send files", "url": "/app", "icons": [{"src": "/icon.svg", "sizes": "any"}]},
+    {"name": "Receive Files", "short_name": "Receive", "description": "Join room and receive files", "url": "/app", "icons": [{"src": "/icon.svg", "sizes": "any"}]}
+  ],
+  "share_target": {
+    "action": "/?action=share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {"files": [{"name": "files", "accept": ["image/*", "video/*", "application/*", "*/*"]}]}
+  }
+}

@@ -587,7 +587,7 @@ export function RoomView({
             </div>
             <div className="mt-2 flex items-start gap-2">
               <Shield className="w-4 h-4 text-amber-300 shrink-0 mt-0.5" />
-              <p className="text-xs text-amber-100/90">
+              <p className="text-xs text-amber-900/90 dark:text-amber-100/90">
                 Security tip: this room code works like an access key, share it only with trusted people.
               </p>
             </div>

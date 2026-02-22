@@ -4,25 +4,36 @@ import { extractRoomId, isValidUUID } from '@/lib/utils';
 import { WelcomeView } from '@/components/welcome/WelcomeView';
 import { getSiteUrl } from '@/lib/site';
 
+const TITLE = 'CoralSend - Fast Private File Transfer';
+const DESCRIPTION =
+  'Share files directly between devices with WebRTC. No account, no cloud storage, encrypted in transit. P2P file sharing that respects your privacy.';
+
 export const metadata: Metadata = {
-  title: 'CoralSend - Fast Private File Transfer',
-  description:
-    'Share files directly between devices with WebRTC. No account, no cloud storage, and encrypted in transit.',
+  title: TITLE,
+  description: DESCRIPTION,
+  keywords: [
+    'file transfer',
+    'p2p file sharing',
+    'secure file transfer',
+    'WebRTC',
+    'encrypted transfer',
+    'no account',
+    'privacy',
+    'peer to peer',
+  ],
   alternates: {
     canonical: '/',
   },
   openGraph: {
-    title: 'CoralSend - Fast Private File Transfer',
-    description:
-      'Share files directly between devices with WebRTC. No account, no cloud storage, and encrypted in transit.',
+    title: TITLE,
+    description: DESCRIPTION,
     url: '/',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'CoralSend - Fast Private File Transfer',
-    description:
-      'Share files directly between devices with WebRTC. No account, no cloud storage, and encrypted in transit.',
+    title: TITLE,
+    description: DESCRIPTION,
   },
 };
 
@@ -57,6 +68,8 @@ export default async function WelcomePage({
   }
 
   const siteUrl = getSiteUrl();
+  const appUrl = `${siteUrl}/app`;
+
   const websiteJsonLd = {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
@@ -64,6 +77,11 @@ export default async function WelcomePage({
     url: siteUrl,
     description:
       'Transfer files securely and directly between devices. No sign-up, no storage, just secure peer-to-peer file sharing.',
+    potentialAction: {
+      '@type': 'ViewAction',
+      target: appUrl,
+      name: 'Open App',
+    },
   };
 
   const appJsonLd = {
@@ -72,9 +90,10 @@ export default async function WelcomePage({
     name: 'CoralSend',
     applicationCategory: 'UtilitiesApplication',
     operatingSystem: 'Web',
-    url: siteUrl,
+    url: appUrl,
+    sameAs: siteUrl,
     description:
-      'Create a room, share the link, and send files straight to another device over encrypted WebRTC channels.',
+      'Create a room, share the link, and send files straight to another device over encrypted WebRTC channels. P2P, encrypted, no account required.',
     offers: {
       '@type': 'Offer',
       price: '0',

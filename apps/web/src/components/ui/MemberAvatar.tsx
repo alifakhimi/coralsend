@@ -3,6 +3,7 @@
 import { cn } from '@/lib/utils';
 import { getInitials, getAvatarColor } from '@/lib/deviceId';
 import type { Member } from '@/store/store';
+import { FitText } from './FitText';
 
 interface MemberAvatarProps {
   member: Member;
@@ -16,9 +17,9 @@ interface MemberAvatarProps {
 
 export function MemberAvatar({ member, size = 'md', showStatus = true, statusOverride, className, style }: MemberAvatarProps) {
   const sizes = {
-    sm: 'w-8 h-8 text-xs',
-    md: 'w-10 h-10 text-sm',
-    lg: 'w-14 h-14 text-base',
+    sm: 'w-4 h-4',
+    md: 'w-8 h-8',
+    lg: 'w-10 h-10',
   };
 
   const statusColors = {
@@ -35,16 +36,18 @@ export function MemberAvatar({ member, size = 'md', showStatus = true, statusOve
     <div className={cn('relative inline-flex', className)} style={style}>
       <div
         className={cn(
-          'rounded-full flex items-center justify-center font-bold text-white',
+          'rounded-full p-[15%] flex items-center justify-center font-bold text-white leading-none overflow-hidden',
           sizes[size],
           member.isMe && showStatus && 'ring-2 ring-[var(--color-accent)]'
         )}
         style={{ backgroundColor: bgColor }}
         title={`${member.displayName} (${status})`}
       >
-        {initials}
+        <FitText className="w-full h-full flex items-center justify-center whitespace-nowrap">
+          {initials}
+        </FitText>
       </div>
-      
+
       {showStatus && (
         <span
           className={cn(

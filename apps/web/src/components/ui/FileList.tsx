@@ -71,9 +71,9 @@ interface FileItemProps {
 function ConnectionPathIcon({ path }: { path?: ConnectionPath }) {
   if (!path || path === 'unknown') return null;
   if (path === 'direct') {
-    return <Wifi className="w-3 h-3 text-[var(--color-accent)] flex-shrink-0" aria-label="Direct (LAN)" role="img" />;
+    return <Wifi className="w-3 h-3 text-[var(--color-accent)] flex-shrink-0" aria-label="Direct peer-to-peer" role="img" />;
   }
-  return <Globe className="w-3 h-3 text-[var(--color-warning)] flex-shrink-0" aria-label="Via internet (relay)" role="img" />;
+  return <Globe className="w-3 h-3 text-[var(--color-warning)] flex-shrink-0" aria-label="Via TURN relay" role="img" />;
 }
 
 function FileItem({
@@ -229,32 +229,6 @@ function FileItem({
             </div>
           )}
 
-          {/* Download progress */}
-          {isInbox && isDownloading && (
-            <div className="mt-2.5">
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-glass-strong)]">
-                <div
-                  className="h-full rounded-full bg-[var(--color-accent)] transition-[width] duration-500 ease-out relative"
-                  style={{ width: `${progressValue}%` }}
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent animate-shimmer [background-size:200%_100%]" />
-                </div>
-              </div>
-              <div className="mt-1 flex items-center justify-between text-xs text-[var(--text-muted)]">
-                <span className="flex items-center gap-1.5">
-                  Downloading
-                  {file.speed != null && file.speed > 0 && (
-                    <span className="text-[var(--color-accent)]">{formatSpeed(file.speed)}</span>
-                  )}
-                  {file.eta != null && file.eta > 0 && (
-                    <span>{formatEta(file.eta)}</span>
-                  )}
-                </span>
-                <span className="font-medium text-[var(--color-accent)]">{progressValue}%</span>
-              </div>
-            </div>
-          )}
-
           {/* Error message */}
           {isError && (
             <div className="mt-1 text-xs text-[var(--color-error)]">
@@ -286,6 +260,32 @@ function FileItem({
           )}
         </div>
       </div>
+
+      {/* Download progress - full-width section below icon and Save button */}
+      {isInbox && isDownloading && (
+        <div className="mt-2.5 -mx-3 sm:-mx-4 px-3 sm:px-4 pt-2.5 border-t border-[var(--border-soft)]">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-glass-strong)]">
+            <div
+              className="h-full rounded-full bg-[var(--color-accent)] transition-[width] duration-500 ease-out relative"
+              style={{ width: `${progressValue}%` }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent animate-shimmer [background-size:200%_100%]" />
+            </div>
+          </div>
+          <div className="mt-1 flex items-center justify-between text-xs text-[var(--text-muted)]">
+            <span className="flex items-center gap-1.5">
+              Downloading
+              {file.speed != null && file.speed > 0 && (
+                <span className="text-[var(--color-accent)]">{formatSpeed(file.speed)}</span>
+              )}
+              {file.eta != null && file.eta > 0 && (
+                <span>{formatEta(file.eta)}</span>
+              )}
+            </span>
+            <span className="font-medium text-[var(--color-accent)]">{progressValue}%</span>
+          </div>
+        </div>
+      )}
 
       {/* Download/Retry/Cancel side action for inbox */}
       {isInbox && !selecting && (

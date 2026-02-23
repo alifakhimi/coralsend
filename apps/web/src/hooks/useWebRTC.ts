@@ -53,6 +53,7 @@ const FILE_ID_HEADER = 36;
 const CHUNK_SIZE = 64 * 1024; // 64KB payload (+ 36B header stays well under 256KB maxMessageSize)
 const BUFFER_LOW_THRESHOLD = 128 * 1024; // 128KB (2 chunks)
 const BUFFER_HIGH_THRESHOLD = 1024 * 1024; // 1MB (~16 chunks queued)
+const PROGRESS_UPDATE_BYTES = 256 * 1024; // Update UI every 256KB (avoids 0% for long time on large files)
 const THUMBNAIL_MAX_SIZE = 200; // Max thumbnail dimension
 const ICE_DIAGNOSTICS = process.env.NEXT_PUBLIC_ICE_DIAGNOSTICS === 'true';
 
@@ -183,7 +184,7 @@ export const useWebRTC = () => {
 
   // File transfer state
   const pendingFiles = useRef<Map<string, File>>(new Map()); // fileId -> File
-  const incomingChunks = useRef<Map<string, { meta: FileMetadataPayload; chunks: ArrayBuffer[]; receivedBytes: number; startTime: number }>>(new Map());
+  const incomingChunks = useRef<Map<string, { meta: FileMetadataPayload; chunks: ArrayBuffer[]; receivedBytes: number; startTime: number; lastUpdateBytes?: number }>>(new Map());
   const earlyChunks = useRef<Map<string, ArrayBuffer[]>>(new Map()); // chunks arriving before file-start
   const receivedFileBlobs = useRef<Map<string, Blob>>(new Map()); // fileId -> Blob (text files only, for copy)
   const requestModes = useRef<Map<string, 'download' | 'copy'>>(new Map()); // requester intent by fileId
@@ -299,7 +300,7 @@ export const useWebRTC = () => {
 
           const buffered = earlyChunks.current.get(meta.id);
           const receivedBytes = buffered ? buffered.reduce((s, c) => s + c.byteLength, 0) : 0;
-          incomingChunks.current.set(meta.id, { meta, chunks: buffered ?? [], receivedBytes, startTime: Date.now() });
+          incomingChunks.current.set(meta.id, { meta, chunks: buffered ?? [], receivedBytes, startTime: Date.now(), lastUpdateBytes: 0 });
           earlyChunks.current.delete(meta.id);
           if (buffered) {
             logger.info('Transfer', `Flushed ${buffered.length} early chunks (${receivedBytes} bytes)`, meta.id);
@@ -378,9 +379,13 @@ export const useWebRTC = () => {
         incoming.receivedBytes += chunk.byteLength;
         const progress = Math.min(100, Math.round((incoming.receivedBytes / incoming.meta.size) * 100));
 
-        // Throttle UI store updates to 1% steps
+        // Update UI: every 256KB received or 1% progress (avoids 0% for long time on large files)
+        const lastUpdateBytes = incoming.lastUpdateBytes ?? 0;
+        const bytesSinceLastUpdate = incoming.receivedBytes - lastUpdateBytes;
         const prevProgress = store.currentRoom?.files.find(f => f.id === fileId)?.progress ?? 0;
-        if (progress >= 100 || progress - prevProgress >= 1) {
+        const shouldUpdate = progress >= 100 || progress - prevProgress >= 1 || bytesSinceLastUpdate >= PROGRESS_UPDATE_BYTES;
+        if (shouldUpdate) {
+          incoming.lastUpdateBytes = incoming.receivedBytes;
           const elapsed = (Date.now() - incoming.startTime) / 1000;
           const speed = elapsed > 0 ? incoming.receivedBytes / elapsed : 0;
           const remaining = incoming.meta.size - incoming.receivedBytes;

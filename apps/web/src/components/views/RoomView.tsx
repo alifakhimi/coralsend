@@ -295,13 +295,13 @@ export function RoomView({
       {/* Header */}
       <header className="px-3 py-2.5 border-b border-[var(--border-soft)] glass-strong">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <Button
-              variant="ghost"
+              variant="secondary"
               size="icon"
               onClick={onLeaveRoom}
               title="Back to home"
-              className="h-10 w-10 p-1.5"
+              className="h-12 w-12 p-1.5"
             >
               <Logo size="sm" showText={false} />
             </Button>
@@ -314,31 +314,28 @@ export function RoomView({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowMembers(true)}
-              className="h-9 px-2 rounded-xl bg-transparent hover:bg-[var(--surface-glass)] transition-colors"
+          <div className="flex items-stretch gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
               aria-label="Show members"
               title="Members"
+              onClick={() => setShowShare(true)}
+            // onClick={() => setShowMembers(true)}
             >
-              <MemberAvatarStack />
-            </button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowSettings(true)}
-              className="h-9 w-9 rounded-xl border border-[var(--border-soft)] bg-[var(--surface-glass)] hover:bg-[var(--surface-glass-strong)]"
-            >
-              <Settings className="w-4 h-4" />
+              <MemberAvatarStack size="md" />
+              <Share2 className="w-4 h-4" />
+              <span className="hidden sm:inline">Share</span>
             </Button>
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => setShowShare(true)}
-              className="h-9 rounded-xl border border-[var(--border-soft)] bg-[var(--surface-glass)] hover:bg-[var(--surface-glass-strong)] px-3"
+              aria-label="Show settings"
+              title="Settings"
+              onClick={() => setShowSettings(true)}
             >
-              <Share2 className="w-4 h-4" />
-              <span className="hidden sm:inline">Share</span>
+              <Settings className="w-4 h-4" />
+              <span className="hidden sm:inline">Settings</span>
             </Button>
           </div>
         </div>

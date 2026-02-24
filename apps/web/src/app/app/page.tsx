@@ -21,9 +21,9 @@ export default function AppHomePage() {
   }, [joinRoom]);
 
   return (
-    <main className="page-shell safe-area overflow-hidden w-full max-w-2xl mx-auto min-h-dvh">
+    <main className="page-shell overflow-hidden w-full max-w-2xl mx-auto">
       <div className="page-glow" />
-      <div className="relative z-10">
+      <div className="relative size-full z-10">
         <HomeView
           onCreateRoom={createRoomAndNavigate}
           onJoinRoom={joinRoom}

@@ -54,16 +54,16 @@ export function BottomSheet({
           exit={{}}
         >
           <motion.div
-            className="absolute inset-0 bg-black/55 backdrop-blur-sm"
+            className="absolute inset-0 backdrop-blur-sm"
             onClick={closeOnBackdropClick ? onClose : undefined}
             aria-hidden
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.28, ease: 'easeOut' }}
+            transition={{ duration: 0.28, ease: 'easeInOut' }}
           />
 
-          <div className="relative flex h-full w-full items-end pointer-events-none">
+          <div className="relative flex w-full h-dvh items-end pointer-events-none">
             <motion.div
               role="dialog"
               aria-modal="true"
@@ -75,24 +75,25 @@ export function BottomSheet({
             >
               <div
                 className={cn(
-                  'relative min-h-[50dvh] max-h-[100dvh] w-full rounded-t-2xl glass-strong border border-[var(--border-soft)]',
+                  'relative min-h-[50dvh] w-full rounded-t-2xl glass border border-(--border-soft) border-b-0',
                   'flex flex-col overflow-hidden',
+                  'max-h-dvh-safe pb-safe-bottom',
                   className
                 )}
               >
                 <div className="absolute top-1.5 left-1/2 -translate-x-1/2 z-10 flex justify-center pointer-events-none">
-                  <span className="w-10 h-1 rounded-full bg-[var(--text-muted)]/60" />
+                  <span className="w-10 h-1 rounded-full bg-(--text-muted)/60" />
                 </div>
 
                 {(title || icon) && (
-                  <div className="flex items-center justify-between px-3 py-1.5 pt-2 border-b border-[var(--border-soft)] shrink-0">
+                  <div className="flex items-center justify-between px-3 py-1.5 pt-2 border-b-0 border-(--border-soft) shrink-0">
                     <div className="flex items-center gap-2">
                       {icon}
-                      <h2 className="font-semibold text-[var(--text-primary)]">{title}</h2>
+                      <h2 className="font-semibold text-(--text-primary)">{title}</h2>
                     </div>
                     <button
                       onClick={onClose}
-                      className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-glass)] transition-colors"
+                      className="p-1.5 rounded-md text-(--text-muted) hover:text-(--text-primary) hover:bg-(--surface-glass) transition-colors"
                       aria-label="Close sheet"
                     >
                       <X className="w-4 h-4" />
@@ -103,7 +104,7 @@ export function BottomSheet({
                 <div className="flex-1 min-h-0 overflow-y-auto p-4">{children}</div>
 
                 {footer && (
-                  <div className="border-t border-[var(--border-soft)] p-4">{footer}</div>
+                  <div className="border-t border-(--border-soft) p-4">{footer}</div>
                 )}
               </div>
             </motion.div>

@@ -1,6 +1,23 @@
 @import "tailwindcss";
 
 @theme inline {
+  /* Mobile breakpoints (below default sm: 640px) */
+
+  /* 320px – very small phones (iPhone SE 1st gen) */
+  --breakpoint-xxs: 20rem;
+  /* 375px – small phones (iPhone SE 2nd/3rd, iPhone 12 mini) */
+  --breakpoint-xs: 23.4375rem;
+  /* 640px – default sm */
+  --breakpoint-sm: 40rem;
+  /* 768px */
+  --breakpoint-md: 48rem;
+  /* 1024px */
+  --breakpoint-lg: 64rem;
+  /* 1280px */
+  --breakpoint-xl: 80rem;
+  /* 1536px */
+  --breakpoint-2xl: 96rem;
+
   --font-sans: var(--font-dm-sans), "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: var(--font-jetbrains-mono), "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", monospace;
 
@@ -66,6 +83,7 @@
 
   /* Borders */
   --border-soft: rgba(139, 153, 174, 0.20);
+  --border-hard: rgba(139, 153, 174, 0.50);
 
   /* Brand / accent / secondary (dark mode values) */
   --color-brand: #F07070;
@@ -99,7 +117,7 @@
   /* Page effects */
   --page-glow: radial-gradient(circle at 25% 25%, rgba(240, 112, 112, 0.10) 0%, transparent 50%),
     radial-gradient(circle at 75% 75%, rgba(20, 184, 166, 0.10) 0%, transparent 50%);
-  --page-glow-opacity: 0.28;
+  --page-glow-opacity: 1;
 
   /* Gradient (brand) */
   --gradient-brand: linear-gradient(135deg, var(--color-brand), var(--color-accent));
@@ -120,6 +138,7 @@
     --text-muted: #4B5563;
 
     --border-soft: rgba(17, 24, 39, 0.15);
+    --border-hard: rgba(17, 24, 39, 0.30);
 
     --color-brand: #D94545;
     --color-brand-hover: #c53030;
@@ -155,12 +174,13 @@ html.dark {
   --bg-base: #0B1120;
   --bg-elevated: #141D30;
   --bg-surface: #1A2540;
-  --surface-glass: rgba(20, 29, 48, 0.55);
-  --surface-glass-strong: rgba(20, 29, 48, 0.78);
+  --surface-glass: rgba(20, 29, 48, 0.2);
+  --surface-glass-strong: rgba(20, 29, 48, 0.6);
 
   --text-primary: #F0F2F5;
   --text-muted: #8B99AE;
   --border-soft: rgba(139, 153, 174, 0.20);
+  --border-hard: rgba(139, 153, 174, 0.50);
 
   --color-brand: #F07070;
   --color-brand-hover: #f58585;
@@ -186,7 +206,7 @@ html.dark {
   --color-success-bg: rgba(52, 211, 153, 0.08);
   --color-warning: #fbbf24;
 
-  --page-glow-opacity: 0.28;
+  --page-glow-opacity: 1;
 }
 
 /* Manual light override */
@@ -201,6 +221,7 @@ html.light {
   --text-primary: #111827;
   --text-muted: #4B5563;
   --border-soft: rgba(17, 24, 39, 0.15);
+  --border-hard: rgba(17, 24, 39, 0.30);
 
   --color-brand: #D94545;
   --color-brand-hover: #c53030;
@@ -232,9 +253,8 @@ html.light {
 body {
   background-color: var(--bg-base);
   color: var(--text-primary);
-  min-height: 100vh;
-  min-height: 100dvh;
-  overflow-x: hidden;
+  height: 100lvh;
+  overflow: hidden;
 }
 
 ::selection {
@@ -242,7 +262,7 @@ body {
   color: var(--text-primary);
 }
 
-::-webkit-scrollbar {
+/* ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
@@ -258,7 +278,7 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(100, 116, 139, 0.7);
-}
+} */
 
 :focus-visible {
   outline: 2px solid var(--focus-ring);
@@ -461,9 +481,14 @@ button:disabled,
   border-color: var(--border-soft);
 }
 
+.border-hard {
+  border-color: var(--border-hard);
+}
+
 /* ─── Page shell ─── */
 .page-shell {
-  min-height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
   min-height: 100dvh;
   background-color: var(--bg-base);
   color: var(--text-primary);
@@ -488,11 +513,21 @@ button:disabled,
 /* ─── Safe area (PWA) ─── */
 @supports (padding: max(0px)) {
   .safe-area {
-    padding-top: max(env(safe-area-inset-top), 0px);
-    padding-bottom: max(env(safe-area-inset-bottom), 0px);
+    position: relative;
+    padding-top: max(env(safe-area-inset-top), calc(var(--spacing) * 2));
+    padding-bottom: max(env(safe-area-inset-bottom), calc(var(--spacing) * 2));
     padding-left: max(env(safe-area-inset-left), 0px);
     padding-right: max(env(safe-area-inset-right), 0px);
   }
+}
+
+/* Bottom sheet / modal: cap height above notch, pad above home indicator.
+ * env() falls back to 0px where unsupported, so safe on all devices. */
+.max-h-dvh-safe {
+  max-height: calc(100dvh - env(safe-area-inset-top, 0px));
+}
+.pb-safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* ─── QR reader overrides ─── */

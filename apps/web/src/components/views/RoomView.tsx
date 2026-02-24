@@ -70,7 +70,6 @@ export function RoomView({
   const restoreFiles = useStore((s) => s.restoreFiles);
   const emptyTrashByDirection = useStore((s) => s.emptyTrashByDirection);
   const purgeFiles = useStore((s) => s.purgeFiles);
-  const [showMembers, setShowMembers] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -291,9 +290,9 @@ export function RoomView({
   };
 
   return (
-    <div className="h-dvh flex flex-col animate-in fade-in slide-in-from-right duration-300">
+    <div className="safe-area flex flex-col h-full animate-in fade-in slide-in-from-right duration-300">
       {/* Header */}
-      <header className="px-3 py-2.5 border-b border-[var(--border-soft)] glass-strong">
+      <header className="shrink-0 px-4 pb-2">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2 shrink-0">
             <Button
@@ -306,8 +305,8 @@ export function RoomView({
               <Logo size="sm" showText={false} />
             </Button>
             <div>
-              <h1 className="font-semibold text-[var(--text-primary)] text-sm">Room {currentRoom.id}</h1>
-              <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+              <h1 className="font-semibold text-(--text-primary) text-sm">Room {currentRoom.id}</h1>
+              <div className="flex items-center gap-1.5 text-xs text-(--text-muted)">
                 <Users className="w-3 h-3" />
                 <span>{currentRoom.members.length} members</span>
               </div>
@@ -318,10 +317,9 @@ export function RoomView({
             <Button
               variant="secondary"
               size="sm"
-              aria-label="Show members"
-              title="Members"
+              aria-label="Share room"
+              title="Share room"
               onClick={() => setShowShare(true)}
-            // onClick={() => setShowMembers(true)}
             >
               <MemberAvatarStack size="md" />
               <Share2 className="w-4 h-4" />
@@ -558,23 +556,6 @@ export function RoomView({
         </button>
       </div>
 
-      {/* Members sheet */}
-      <BottomSheet
-        isOpen={showMembers}
-        onClose={() => setShowMembers(false)}
-        title={
-          <span className="flex items-center gap-2">
-            <span>Members</span>
-            <span className="text-sm font-normal text-[var(--text-muted)]">
-              ({currentRoom.members.length})
-            </span>
-          </span>
-        }
-        icon={<Users className="w-4 h-4 text-[var(--text-muted)]" />}
-      >
-        <MemberList onRetryConnection={onRetryConnection} />
-      </BottomSheet>
-
       {/* Chat sheet */}
       <BottomSheet
         isOpen={showChat}
@@ -591,65 +572,77 @@ export function RoomView({
         isOpen={showShare}
         onClose={() => setShowShare(false)}
         title="Share Room"
-        icon={<Share2 className="w-4 h-4 text-[var(--text-muted)]" />}
+        icon={<Share2 className="w-4 h-4 text-(--text-muted)" />}
       >
-        <div className="flex flex-col items-center gap-4">
-          <div className="bg-white p-3 rounded-xl shadow-lg">
-            <QRCodeSVG value={shareUrl} size={150} level="H" />
+        <div className="flex flex-col items-stretch gap-4 mb-12">
+          <div className="w-full flex flex-row justify-center flex-wrap gap-4 items-center">
+            <div className="bg-white p-3 rounded-xl shadow-lg shrink-0">
+              <QRCodeSVG value={shareUrl} size={150} level="H" />
+            </div>
+
+            <div className="space-y-3 flex-1">
+              <div className="glass rounded-xl border border-(--border-soft) p-3">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <p className="text-xs uppercase tracking-wider text-(--text-muted)">Room Code</p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => copyValue(currentRoom.id, 'code')}
+                    className="h-7 px-2"
+                  >
+                    {copiedField === 'code' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span className="text-xs">{copiedField === 'code' ? 'Copied' : 'Copy'}</span>
+                  </Button>
+                </div>
+                <div className="flex items-end flex-wrap gap-2">
+                  <p className="text-3xl sm:text-[2rem] font-mono font-extrabold tracking-[0.18em] text-(--color-accent) leading-none">
+                    {currentRoom.id}
+                  </p>
+                  {roomName && (
+                    <span className="mb-1 rounded-full border border-(--color-accent-border) bg-(--color-accent-subtle) px-2.5 py-1 text-xs font-semibold text-(--color-accent)">
+                      {roomName}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-2 text-xs text-(--text-muted)">
+                  This code is your room key. Anyone with it can join directly.
+                </p>
+              </div>
+
+              <Button
+                variant="secondary"
+                onClick={handleShareLink}
+                className="w-full"
+              >
+                {copiedField === 'link' ? <Check className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
+                {copiedField === 'link' ? 'Link copied' : 'Share'}
+              </Button>
+            </div>
           </div>
 
-          <div className="w-full max-w-md glass rounded-xl border border-[color-mix(in_srgb,var(--color-warning)_20%,transparent)] bg-[color-mix(in_srgb,var(--color-warning)_5%,transparent)] p-3">
+          <div className="w-full glass rounded-xl border border-[color-mix(in_srgb,var(--color-warning)_20%,transparent)] bg-[color-mix(in_srgb,var(--color-warning)_5%,transparent)] p-3">
             <div className="flex items-start gap-2">
-              <Camera className="w-4 h-4 text-[var(--color-warning)] shrink-0 mt-0.5" />
-              <p className="text-xs text-[var(--text-muted)]">
+              <Camera className="w-4 h-4 text-(--color-primary) shrink-0 mt-0.5" />
+              <p className="text-xs text-(--text-muted)">
                 Scan this QR code with your camera to join the room instantly.
               </p>
             </div>
             <div className="mt-2 flex items-start gap-2">
-              <Shield className="w-4 h-4 text-[var(--color-warning)] shrink-0 mt-0.5" />
-              <p className="text-xs text-[var(--color-warning)]">
-                Security tip: this room code works like an access key, share it only with trusted people.
+              <Shield className="w-4 h-4 text-(--color-warning) shrink-0 mt-0.5" />
+              <p className="text-xs text-(--color-warning)">
+                <strong>Security tip: </strong>this room code works like an access key, share it only with trusted people.
               </p>
             </div>
           </div>
 
-          <div className="w-full max-w-md space-y-3">
-            <div className="glass rounded-xl border border-[var(--border-soft)] p-3">
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <p className="text-xs uppercase tracking-wider text-[var(--text-muted)]">Room Code</p>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => copyValue(currentRoom.id, 'code')}
-                  className="h-7 px-2"
-                >
-                  {copiedField === 'code' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span className="text-xs">{copiedField === 'code' ? 'Copied' : 'Copy'}</span>
-                </Button>
-              </div>
-              <div className="flex items-end flex-wrap gap-2">
-                <p className="text-4xl sm:text-[2.75rem] font-mono font-extrabold tracking-[0.18em] text-[var(--color-accent)] leading-none">
-                  {currentRoom.id}
-                </p>
-                {roomName && (
-                  <span className="mb-1 rounded-full border border-[var(--color-accent-border)] bg-[var(--color-accent-subtle)] px-2.5 py-1 text-xs font-semibold text-[var(--color-accent)]">
-                    {roomName}
-                  </span>
-                )}
-              </div>
-              <p className="mt-2 text-xs text-[var(--text-muted)]">
-                This code is your room key. Anyone with it can join directly.
-              </p>
+          <div className="w-full glass rounded-xl border border-(--border-soft) p-3">
+            <div className="flex items-baseline gap-2 mb-3">
+              <Users className="w-4 h-4 text-(--text-muted)" />
+              <h3 className="text-sm font-semibold text-(--text-primary)">
+                Members ({currentRoom.members.length})
+              </h3>
             </div>
-
-            <Button
-              variant="secondary"
-              onClick={handleShareLink}
-              className="w-full"
-            >
-              {copiedField === 'link' ? <Check className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
-              {copiedField === 'link' ? 'Link copied' : 'Share'}
-            </Button>
+            <MemberList layout="list" onRetryConnection={onRetryConnection} />
           </div>
         </div>
       </BottomSheet>

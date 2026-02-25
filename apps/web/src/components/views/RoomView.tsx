@@ -1,15 +1,14 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { QRCodeSVG } from 'qrcode.react';
 import { useStore, type FileMetadata } from '@/store/store';
 import { useToastStore } from '@/store/toast';
 import { getBaseUrl } from '@/lib/constants';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { cn } from '@/lib/utils';
 import {
   Button,
   Logo,
-  MemberList,
   MemberAvatarStack,
   FileList,
   BottomSheet,
@@ -19,10 +18,9 @@ import {
   ChatMessages,
   ChatInput,
   RoomSettings,
+  ShareRoomSheet,
 } from '@/components/ui';
 import {
-  Copy,
-  Check,
   FileUp,
   Share2,
   Users,
@@ -37,8 +35,6 @@ import {
   CheckSquare,
   RotateCcw,
   RefreshCw,
-  Shield,
-  Camera,
 } from 'lucide-react';
 
 interface RoomViewProps {
@@ -73,7 +69,7 @@ export function RoomView({
   const [showChat, setShowChat] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [copiedField, setCopiedField] = useState<'link' | 'code' | null>(null);
+  const { copy, copied: copiedKey } = useCopyToClipboard<'code' | 'link'>();
   const [activeTab, setActiveTab] = useState<'inbox' | 'outbox'>('inbox');
   const [showTrash, setShowTrash] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -180,20 +176,8 @@ export function RoomView({
 
   const canUsePasteButton = typeof navigator !== 'undefined' && typeof navigator.clipboard?.read === 'function';
 
-  // Copy helpers for share sheet
-  const copyValue = async (value: string, field: 'link' | 'code') => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopiedField(field);
-      setTimeout(() => setCopiedField(null), 1800);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
-  };
-
-  // Share: use Web Share API if available, else copy link and show toast.
-  // On any share failure (including AbortError when user cancels), fall back to copy.
-  const handleShareLink = async () => {
+  // Share: use Web Share API if available, else copy link. Hook drives "Link copied" state.
+  const handleShareLink = useCallback(async () => {
     if (typeof navigator !== 'undefined' && navigator.share) {
       try {
         await navigator.share({
@@ -202,15 +186,14 @@ export function RoomView({
           url: shareUrl,
         });
       } catch {
-        // Share cancelled (AbortError) or failed — copy link as fallback
-        await copyValue(shareUrl, 'link');
+        await copy(shareUrl, 'link');
         showToast('Link copied');
       }
     } else {
-      await copyValue(shareUrl, 'link');
+      await copy(shareUrl, 'link');
       showToast('Link copied');
     }
-  };
+  }, [currentRoom?.id, shareUrl, copy, showToast]);
 
   // Handle file selection
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -561,7 +544,7 @@ export function RoomView({
         isOpen={showChat}
         onClose={() => setShowChat(false)}
         title="Chat"
-        icon={<MessageSquare className="w-4 h-4 text-[var(--text-muted)]" />}
+        icon={<MessageSquare className="w-4 h-4 text-[var(--color-accent)]" />}
         footer={<ChatInput onSend={onSendChat} />}
       >
         <ChatMessages messages={roomMessages} />
@@ -571,80 +554,21 @@ export function RoomView({
       <BottomSheet
         isOpen={showShare}
         onClose={() => setShowShare(false)}
-        title="Share Room"
-        icon={<Share2 className="w-4 h-4 text-(--text-muted)" />}
+        title="Share room"
+        icon={<Share2 className="w-4 h-4 text-[var(--color-accent)]" />}
       >
-        <div className="flex flex-col items-stretch gap-4 mb-12">
-          <div className="w-full flex flex-row justify-center flex-wrap gap-4 items-center">
-            <div className="bg-white p-3 rounded-xl shadow-lg shrink-0">
-              <QRCodeSVG value={shareUrl} size={150} level="H" />
-            </div>
-
-            <div className="space-y-3 flex-1">
-              <div className="glass rounded-xl border border-(--border-soft) p-3">
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <p className="text-xs uppercase tracking-wider text-(--text-muted)">Room Code</p>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => copyValue(currentRoom.id, 'code')}
-                    className="h-7 px-2"
-                  >
-                    {copiedField === 'code' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span className="text-xs">{copiedField === 'code' ? 'Copied' : 'Copy'}</span>
-                  </Button>
-                </div>
-                <div className="flex items-end flex-wrap gap-2">
-                  <p className="text-3xl sm:text-[2rem] font-mono font-extrabold tracking-[0.18em] text-(--color-accent) leading-none">
-                    {currentRoom.id}
-                  </p>
-                  {roomName && (
-                    <span className="mb-1 rounded-full border border-(--color-accent-border) bg-(--color-accent-subtle) px-2.5 py-1 text-xs font-semibold text-(--color-accent)">
-                      {roomName}
-                    </span>
-                  )}
-                </div>
-                <p className="mt-2 text-xs text-(--text-muted)">
-                  This code is your room key. Anyone with it can join directly.
-                </p>
-              </div>
-
-              <Button
-                variant="secondary"
-                onClick={handleShareLink}
-                className="w-full"
-              >
-                {copiedField === 'link' ? <Check className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
-                {copiedField === 'link' ? 'Link copied' : 'Share'}
-              </Button>
-            </div>
-          </div>
-
-          <div className="w-full glass rounded-xl border border-[color-mix(in_srgb,var(--color-warning)_20%,transparent)] bg-[color-mix(in_srgb,var(--color-warning)_5%,transparent)] p-3">
-            <div className="flex items-start gap-2">
-              <Camera className="w-4 h-4 text-(--color-primary) shrink-0 mt-0.5" />
-              <p className="text-xs text-(--text-muted)">
-                Scan this QR code with your camera to join the room instantly.
-              </p>
-            </div>
-            <div className="mt-2 flex items-start gap-2">
-              <Shield className="w-4 h-4 text-(--color-warning) shrink-0 mt-0.5" />
-              <p className="text-xs text-(--color-warning)">
-                <strong>Security tip: </strong>this room code works like an access key, share it only with trusted people.
-              </p>
-            </div>
-          </div>
-
-          <div className="w-full glass rounded-xl border border-(--border-soft) p-3">
-            <div className="flex items-baseline gap-2 mb-3">
-              <Users className="w-4 h-4 text-(--text-muted)" />
-              <h3 className="text-sm font-semibold text-(--text-primary)">
-                Members ({currentRoom.members.length})
-              </h3>
-            </div>
-            <MemberList layout="list" onRetryConnection={onRetryConnection} />
-          </div>
-        </div>
+        {currentRoom && (
+          <ShareRoomSheet
+            roomCode={currentRoom.id}
+            roomName={currentRoom.name?.trim() || undefined}
+            shareUrl={shareUrl}
+            copiedKey={copiedKey}
+            onCopyCode={() => void copy(currentRoom.id, 'code')}
+            onShareLink={handleShareLink}
+            memberCount={currentRoom.members.length}
+            onRetryConnection={onRetryConnection}
+          />
+        )}
       </BottomSheet>
 
       {/* Hidden file input */}

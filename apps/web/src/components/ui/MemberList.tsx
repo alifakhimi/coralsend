@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { MemberAvatar } from './MemberAvatar';
 import { useStore } from '@/store/store';
-import { RefreshCw, Wifi, Globe } from 'lucide-react';
+import { RefreshCw, Wifi, Globe, Loader2 } from 'lucide-react';
 import { Button } from './Button';
 
 interface MemberListProps {
@@ -183,9 +183,12 @@ export function MemberList({ className, onRetryConnection, layout = 'list' }: Me
       ))}
 
       {otherMembers.length === 0 && (
-        <p className="text-sm text-(--text-muted) text-center py-4">
-          Waiting for others to join...
-        </p>
+        <div className="flex flex-row flex-nowrap gap-1 items-center justify-center py-4 gap-2">
+          <Loader2 className="w-3 h-3 text-(--color-accent) animate-spin" />
+          <p className="text-sm text-(--text-muted) text-center">
+            Waiting for others to join...
+          </p>
+        </div>
       )}
     </div>
   );

@@ -75,7 +75,7 @@ export function BottomSheet({
             >
               <div
                 className={cn(
-                  'relative min-h-[50dvh] w-full rounded-t-2xl glass border border-(--border-soft) border-b-0',
+                  'relative min-h-[50dvh] w-full rounded-t-2xl glass-strong border border-(--border-soft) border-b-0',
                   'flex flex-col overflow-hidden',
                   'max-h-dvh-safe pb-safe-bottom',
                   className

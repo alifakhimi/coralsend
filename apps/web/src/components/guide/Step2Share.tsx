@@ -1,10 +1,9 @@
 'use client';
 
-import { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { getBaseUrl } from '@/lib/constants';
-import { Button, Card, MemberAvatarStack } from '@/components/ui';
-import { Copy, Check, Share2 } from 'lucide-react';
+import { getRoomShareUrl, getRoomSharePayload } from '@/lib/constants';
+import { useShareLink } from '@/hooks/useShareLink';
+import { Button, Card, MemberAvatarStack, ShareLinkButtons } from '@/components/ui';
 import type { Room } from '@/store/store';
 
 interface Step2ShareProps {
@@ -14,35 +13,9 @@ interface Step2ShareProps {
 }
 
 export function Step2Share({ room, onNext, onSkipDemo }: Step2ShareProps) {
-  const [copySuccess, setCopySuccess] = useState(false);
-  const shareUrl = `${getBaseUrl()}/room/${room.id}`;
-
-  const copyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
-  };
-
-  const handleShare = async () => {
-    if (typeof navigator !== 'undefined' && navigator.share) {
-      try {
-        await navigator.share({
-          title: 'CoralSend Room',
-          text: `Join my room to receive files: ${room.id}`,
-          url: shareUrl,
-        });
-      } catch {
-        // Share cancelled (AbortError) or failed — copy link as fallback
-        copyLink();
-      }
-    } else {
-      copyLink();
-    }
-  };
+  const shareUrl = getRoomShareUrl(room.id);
+  const payload = getRoomSharePayload(room.id, shareUrl);
+  const { copyLink, shareLink, copiedKey } = useShareLink({ payload });
 
   const otherMembersCount = room.members.filter((m) => !m.isMe).length;
   const canProceed = otherMembersCount >= 1;
@@ -64,18 +37,14 @@ export function Step2Share({ room, onNext, onSkipDemo }: Step2ShareProps) {
           <div className="flex-1 space-y-3 w-full min-w-0">
             <p className="text-sm text-[var(--text-muted)]">Room code</p>
             <p className="text-xl font-mono font-bold text-[var(--color-accent)] break-all">{room.id}</p>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="secondary" size="sm" onClick={copyLink}>
-                {copySuccess ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                {copySuccess ? 'Copied!' : 'Copy link'}
-              </Button>
-              {typeof navigator !== 'undefined' && 'share' in navigator && (
-                <Button variant="secondary" size="sm" onClick={handleShare}>
-                  <Share2 className="w-4 h-4" />
-                  Share
-                </Button>
-              )}
-            </div>
+            <ShareLinkButtons
+              onCopyLink={copyLink}
+              onShareLink={shareLink}
+              copiedKey={copiedKey}
+              showCopyLink
+              showShare
+              size="sm"
+            />
           </div>
         </div>
       </Card>

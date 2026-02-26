@@ -16,8 +16,8 @@ export interface CopyableFieldProps {
   copied?: boolean;
   /** Called when user clicks copy; pass the value to copy. */
   onCopy: () => void | Promise<void>;
-  /** Optional badge next to value (e.g. room name pill). */
-  badge?: ReactNode;
+  /** Button label when not copied (e.g. "Copy link"). Default "Copy". */
+  copyLabel?: string;
   /** Size of value text. */
   valueSize?: 'sm' | 'md' | 'lg';
   className?: string;
@@ -35,10 +35,10 @@ export function CopyableField({
   value,
   hint,
   copied = false,
-  onCopy,
-  badge,
+  copyLabel = 'Copy',
   valueSize = 'md',
   className,
+  onCopy,
 }: CopyableFieldProps) {
   return (
     <div className={cn('space-y-0', className)}>
@@ -62,14 +62,14 @@ export function CopyableField({
             size="sm"
             onClick={onCopy}
             className="h-7 px-2 text-xs"
-            aria-label={copied ? 'Copied' : 'Copy'}
+            aria-label={copied ? 'Copied' : copyLabel}
           >
             {copied ? (
               <Check className="h-3.5 w-3.5 text-[var(--color-success)]" aria-hidden />
             ) : (
               <Copy className="h-3.5 w-3.5" aria-hidden />
             )}
-            <span>{copied ? 'Copied' : 'Copy'}</span>
+            <span>{copied ? 'Copied' : copyLabel}</span>
           </Button>
         </div>
       </div>

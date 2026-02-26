@@ -3,8 +3,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useStore, type FileMetadata } from '@/store/store';
 import { useToastStore } from '@/store/toast';
-import { getBaseUrl } from '@/lib/constants';
-import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
+import { getRoomShareUrl, getRoomSharePayload } from '@/lib/constants';
+import { useShareLink } from '@/hooks/useShareLink';
 import { cn } from '@/lib/utils';
 import {
   Button,
@@ -69,7 +69,6 @@ export function RoomView({
   const [showChat, setShowChat] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const { copy, copied: copiedKey } = useCopyToClipboard<'code' | 'link'>();
   const [activeTab, setActiveTab] = useState<'inbox' | 'outbox'>('inbox');
   const [showTrash, setShowTrash] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -79,7 +78,12 @@ export function RoomView({
   const [pasteError, setPasteError] = useState<string | null>(null);
   const [isPasting, setIsPasting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const shareUrl = currentRoom ? `${getBaseUrl()}/room/${currentRoom.id}` : '';
+  const shareUrl = currentRoom ? getRoomShareUrl(currentRoom.id) : '';
+  const sharePayload = currentRoom ? getRoomSharePayload(currentRoom.id, shareUrl) : null;
+  const { copyLink, shareLink, copiedKey } = useShareLink({
+    payload: sharePayload ?? { title: '', text: '', url: shareUrl },
+    onCopied: () => showToast('Link copied'),
+  });
 
   // Paste from clipboard (keyboard or button): share all files without filtering
   const processPastedFiles = useCallback(
@@ -175,25 +179,6 @@ export function RoomView({
   }, [processPastedFiles]);
 
   const canUsePasteButton = typeof navigator !== 'undefined' && typeof navigator.clipboard?.read === 'function';
-
-  // Share: use Web Share API if available, else copy link. Hook drives "Link copied" state.
-  const handleShareLink = useCallback(async () => {
-    if (typeof navigator !== 'undefined' && navigator.share) {
-      try {
-        await navigator.share({
-          title: 'CoralSend Room',
-          text: `Join my room to receive files: ${currentRoom?.id ?? ''}`,
-          url: shareUrl,
-        });
-      } catch {
-        await copy(shareUrl, 'link');
-        showToast('Link copied');
-      }
-    } else {
-      await copy(shareUrl, 'link');
-      showToast('Link copied');
-    }
-  }, [currentRoom?.id, shareUrl, copy, showToast]);
 
   // Handle file selection
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -563,8 +548,8 @@ export function RoomView({
             roomName={currentRoom.name?.trim() || undefined}
             shareUrl={shareUrl}
             copiedKey={copiedKey}
-            onCopyCode={() => void copy(currentRoom.id, 'code')}
-            onShareLink={handleShareLink}
+            onCopyLink={copyLink}
+            onShareLink={shareLink}
             memberCount={currentRoom.members.length}
             onRetryConnection={onRetryConnection}
           />

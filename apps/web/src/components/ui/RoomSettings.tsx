@@ -14,6 +14,7 @@ import {
   Hash,
   Tag,
 } from 'lucide-react';
+import { getRoomShareUrl } from '@/lib/constants';
 
 const MAX_MEMBER_OPTIONS = [2, 4, 8, 16] as const;
 const EXPIRE_OPTIONS = [
@@ -41,7 +42,7 @@ export function RoomSettings({ isOpen, onClose, className }: RoomSettingsProps) 
   const [autoExpire, setAutoExpire] = useState<AutoExpireValue>('never');
   const [requireApproval, setRequireApproval] = useState(false);
 
-  const { copy, copied } = useCopyToClipboard<'roomCode'>();
+  const { copy, copied } = useCopyToClipboard<'code'>();
 
   // Sync local name when room changes (e.g. after rejoin).
   useEffect(() => {
@@ -56,7 +57,7 @@ export function RoomSettings({ isOpen, onClose, className }: RoomSettingsProps) 
   };
 
   const handleCopyCode = () => {
-    void copy(currentRoom.id, 'roomCode');
+    void copy(getRoomShareUrl(currentRoom.id) ?? "", 'code');
   };
 
   return (
@@ -85,8 +86,9 @@ export function RoomSettings({ isOpen, onClose, className }: RoomSettingsProps) 
           <div className="space-y-3">
             <CopyableField
               value={currentRoom.id}
-              hint="Share this code so others can join. Anyone with it has access."
-              copied={copied === 'roomCode'}
+              hint="Copy the room link to share. Anyone with the link can join."
+              copied={copied === 'code'}
+              copyLabel="Copy link"
               onCopy={handleCopyCode}
               valueSize="md"
             />

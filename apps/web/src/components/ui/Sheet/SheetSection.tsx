@@ -22,7 +22,7 @@ export function SheetSection({
   return (
     <div
       className={cn(
-        'glass-strong rounded-xl border border-[var(--border-soft)] p-3 overflow-hidden',
+        'flex flex-col glass-strong rounded-xl border border-[var(--border-soft)] p-3',
         className
       )}
     >
@@ -34,7 +34,7 @@ export function SheetSection({
       {description != null && (
         <p className="mt-0.5 text-xs text-[var(--text-muted)]">{description}</p>
       )}
-      <div className={title != null || description != null ? 'mt-3' : undefined}>
+      <div className={title != null || description != null ? 'flex flex-1' : undefined}>
         {children}
       </div>
     </div>

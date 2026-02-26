@@ -524,7 +524,7 @@ button:disabled,
 /* Bottom sheet / modal: cap height above notch, pad above home indicator.
  * env() falls back to 0px where unsupported, so safe on all devices. */
 .max-h-dvh-safe {
-  max-height: calc(100dvh - env(safe-area-inset-top, 0px));
+  max-height: calc(100dvh - env(safe-area-inset-top, 0px) - calc(var(--spacing) * 2));
 }
 
 .pb-safe-bottom {

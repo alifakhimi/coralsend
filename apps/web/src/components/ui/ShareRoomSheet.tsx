@@ -1,21 +1,21 @@
 'use client';
 
 import { QRCodeSVG } from 'qrcode.react';
-import { Button, MemberList, SheetSection, CopyableField, SheetTip } from '@/components/ui';
-import { Share2, Camera, Shield, Check } from 'lucide-react';
+import { MemberList, SheetSection, CopyableField, SheetTip, ShareLinkButtons, Copyable } from '@/components/ui';
+import { Camera, Shield } from 'lucide-react';
 
 export interface ShareRoomSheetProps {
-  /** Room code (e.g. JUPMD7). */
+  /** Room code (e.g. JUPMD7) — displayed for reference; copy action uses link. */
   roomCode: string;
   /** Optional room name for badge. */
   roomName?: string | null;
-  /** Full URL to share (for QR and link copy). */
+  /** Full URL to share (for QR, copy link, and share). */
   shareUrl: string;
-  /** Current copy key: 'code' | 'link' | null. */
-  copiedKey: 'code' | 'link' | null;
-  /** Copy room code to clipboard. */
-  onCopyCode: () => void | Promise<void>;
-  /** Share link (Web Share API or copy). */
+  /** Current copy key: 'link' when link was just copied. */
+  copiedKey: 'link' | null;
+  /** Copy room link to clipboard. */
+  onCopyLink: () => void | Promise<void>;
+  /** Share (title + message + link) via Web Share or copy link. */
   onShareLink: () => void | Promise<void>;
   /** Member count for heading. */
   memberCount: number;
@@ -23,55 +23,19 @@ export interface ShareRoomSheetProps {
   onRetryConnection?: (deviceId: string) => void;
 }
 
-/** Share sheet content: QR, room code, share button, tips, members. Reusable and theme-aware. */
+/** Share sheet content: QR, room code, copy link + share, tips, members. Reusable and theme-aware. */
 export function ShareRoomSheet({
   roomCode,
   roomName,
   shareUrl,
   copiedKey,
-  onCopyCode,
+  onCopyLink,
   onShareLink,
   memberCount,
   onRetryConnection,
 }: ShareRoomSheetProps) {
   return (
     <div className="flex flex-col gap-4 pb-12">
-      <div className="flex flex-row flex-wrap items-center justify-center gap-4">
-        <div
-          className="shrink-0 rounded-xl border border-[var(--border-soft)] bg-(--color-white) p-3 shadow-lg"
-          aria-hidden
-        >
-          <QRCodeSVG value={shareUrl} size={150} level="H" />
-        </div>
-        <SheetSection
-          title="Room code"
-          className="flex-1 flex-shrink-0 space-y-3 w-full"
-        >
-          <div className="flex flex-col gap-2">
-            <CopyableField
-              label={roomName}
-              value={roomCode}
-              hint="This code is your room key. Anyone with it can join directly."
-              copied={copiedKey === 'code'}
-              onCopy={onCopyCode}
-              valueSize="lg"
-              className="flex-nowrap"
-            />
-            <Button
-              variant="secondary"
-              onClick={onShareLink}
-              className="w-full mt-4"
-            >
-              {copiedKey === 'link' ? (
-                <Check className="h-4 w-4" />
-              ) : (
-                <Share2 className="h-4 w-4" />
-              )}
-              {copiedKey === 'link' ? 'Link copied' : 'Share'}
-            </Button>
-          </div>
-        </SheetSection>
-      </div>
 
       <div className="flex flex-col gap-1">
         <SheetTip variant="info" icon={<Camera className="h-4 w-4" />}>
@@ -87,11 +51,54 @@ export function ShareRoomSheet({
         </SheetTip>
       </div>
 
+      <div className="flex flex-wrap items-stretch justify-center gap-4">
+        <SheetSection
+          title="Room code"
+          className="flex-1 flex-shrink-0 space-y-3"
+        >
+          <div className='flex flex-1 flex-row flex-nowrap items-stretch justify-stretch gap-4'>
+            <div className="flex flex-1 flex-col gap-2">
+              <Copyable
+                value={shareUrl}
+                size='sm'
+                className="flex flex-1 items-start flex-shrink-0"
+              >
+                <p className="text-2xl whitespace-nowrap font-mono font-bold text-[var(--color-accent)]">
+                  {roomCode}</p>
+              </Copyable>
+              <ShareLinkButtons
+                onCopyLink={onCopyLink}
+                onShareLink={onShareLink}
+                copiedKey={copiedKey}
+                showCopyLink
+                showShare
+                size="sm"
+                className="mt-2"
+              />
+            </div>
+
+            <div className='flex flex-none h-full min-h-32 min-w-32 rounded-xl border border-[var(--border-soft)] bg-(--color-white) p-2 shadow-lg'>
+              <QRCodeSVG
+                value={shareUrl}
+                size={20}
+                level="L"
+                fgColor="#000000"
+                className='w-full h-full'
+              />
+            </div>
+          </div>
+        </SheetSection>
+      </div>
+
       <SheetSection
         title={`Members (${memberCount})`}
         description={memberCount === 1 ? "You're the only one here." : `${memberCount} members in this room.`}
       >
-        <MemberList layout="list" onRetryConnection={onRetryConnection} />
+        <MemberList
+          layout="list"
+          onRetryConnection={onRetryConnection}
+          className="flex-1"
+        />
       </SheetSection>
     </div>
   );

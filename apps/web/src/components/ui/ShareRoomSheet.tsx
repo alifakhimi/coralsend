@@ -21,6 +21,11 @@ export interface ShareRoomSheetProps {
   memberCount: number;
   /** Optional retry handler for member list. */
   onRetryConnection?: (deviceId: string) => void;
+  /** Optional remove handler for members. */
+  onRemoveMember?: (deviceId: string) => void;
+  /** Optional approval handlers for pending join requests. */
+  onApproveJoinRequest?: (deviceId: string) => void;
+  onRejectJoinRequest?: (deviceId: string) => void;
 }
 
 /** Share sheet content: QR, room code, copy link + share, tips, members. Reusable and theme-aware. */
@@ -33,6 +38,9 @@ export function ShareRoomSheet({
   onShareLink,
   memberCount,
   onRetryConnection,
+  onRemoveMember,
+  onApproveJoinRequest,
+  onRejectJoinRequest,
 }: ShareRoomSheetProps) {
   return (
     <div className="flex flex-col gap-4 pb-12">
@@ -97,6 +105,9 @@ export function ShareRoomSheet({
         <MemberList
           layout="list"
           onRetryConnection={onRetryConnection}
+          onRemoveMember={onRemoveMember}
+          onApproveJoinRequest={onApproveJoinRequest}
+          onRejectJoinRequest={onRejectJoinRequest}
           className="flex-1"
         />
       </SheetSection>

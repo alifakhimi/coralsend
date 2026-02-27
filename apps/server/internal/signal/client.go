@@ -26,8 +26,9 @@ var upgrader = websocket.Upgrader{
 
 // JoinPayload represents the data sent with a join message
 type JoinPayload struct {
-	DeviceID    string `json:"deviceId"`
-	DisplayName string `json:"displayName"`
+	DeviceID    string        `json:"deviceId"`
+	DisplayName string        `json:"displayName"`
+	Settings    *RoomSettings `json:"settings,omitempty"`
 }
 
 // Client is a middleman between the websocket connection and the hub.
@@ -91,7 +92,53 @@ func (c *Client) readPump() {
 			}
 
 			log.Printf("Join request: room=%s, device=%s, name=%s", c.RoomID, c.DeviceID, c.DisplayName)
-			c.Hub.register <- c
+			c.Hub.HandleJoin(c, joinPayload.Settings)
+
+		case "room-settings":
+			if c.RoomID == msg.RoomID {
+				var payload struct {
+					RoomSettings
+					HostToken string `json:"hostToken,omitempty"`
+				}
+				if msg.Payload != nil {
+					_ = json.Unmarshal(msg.Payload, &payload)
+				}
+				c.Hub.UpdateRoomSettings(c.RoomID, payload.RoomSettings, c.DeviceID, payload.HostToken)
+				msg.DeviceID = c.DeviceID
+				c.Hub.broadcast <- &MessageWrapper{Client: c, Message: &msg}
+			}
+
+		case "join-approved":
+			if c.RoomID == msg.RoomID && msg.TargetID != "" {
+				var payload struct {
+					RequesterID string `json:"requesterId"`
+					HostToken   string `json:"hostToken,omitempty"`
+				}
+				if msg.Payload != nil {
+					_ = json.Unmarshal(msg.Payload, &payload)
+				}
+				requesterID := payload.RequesterID
+				if requesterID == "" {
+					requesterID = msg.TargetID
+				}
+				c.Hub.HandleJoinDecision(c.RoomID, requesterID, true, c.DeviceID, payload.HostToken)
+			}
+
+		case "join-rejected":
+			if c.RoomID == msg.RoomID && msg.TargetID != "" {
+				var payload struct {
+					RequesterID string `json:"requesterId"`
+					HostToken   string `json:"hostToken,omitempty"`
+				}
+				if msg.Payload != nil {
+					_ = json.Unmarshal(msg.Payload, &payload)
+				}
+				requesterID := payload.RequesterID
+				if requesterID == "" {
+					requesterID = msg.TargetID
+				}
+				c.Hub.HandleJoinDecision(c.RoomID, requesterID, false, c.DeviceID, payload.HostToken)
+			}
 
 		case "offer", "answer", "candidate":
 			// WebRTC signaling - relay to specific target or broadcast
@@ -112,6 +159,25 @@ func (c *Client) readPump() {
 			if c.RoomID == msg.RoomID {
 				msg.DeviceID = c.DeviceID
 				c.Hub.broadcast <- &MessageWrapper{Client: c, Message: &msg}
+			}
+
+		case "leave":
+			if c.RoomID != "" {
+				// Client explicitly leaving; close connection to trigger unregister via readPump defer
+				c.conn.Close()
+				return
+			}
+
+		case "member-remove":
+			// Remove a member from room (targeted kick)
+			if c.RoomID == msg.RoomID && msg.TargetID != "" {
+				var payload struct {
+					HostToken string `json:"hostToken,omitempty"`
+				}
+				if msg.Payload != nil {
+					_ = json.Unmarshal(msg.Payload, &payload)
+				}
+				c.Hub.RemoveClient(c.RoomID, msg.TargetID, c.DeviceID, payload.HostToken)
 			}
 
 		default:

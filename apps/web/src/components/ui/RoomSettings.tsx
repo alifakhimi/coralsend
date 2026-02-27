@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useStore } from '@/store/store';
+import { useState } from 'react';
+import { useStore, type AutoExpireValue } from '@/store/store';
 import { Button, Switch, BottomSheet, SheetSection, SheetRow, CopyableField, SegmentGroup, SheetTip } from '@/components/ui';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import {
@@ -11,8 +11,8 @@ import {
   Users,
   Shield,
   Terminal,
-  Hash,
   Tag,
+  DoorOpen,
 } from 'lucide-react';
 import { getRoomShareUrl } from '@/lib/constants';
 
@@ -23,36 +23,54 @@ const EXPIRE_OPTIONS = [
   { value: '24h', label: '24 hours' },
   { value: '7d', label: '7 days' },
 ] as const;
-type AutoExpireValue = (typeof EXPIRE_OPTIONS)[number]['value'];
 
 interface RoomSettingsProps {
   isOpen: boolean;
   onClose: () => void;
+  onUpdateRoomSettings?: (settings: { maxMembers: number; autoExpire: AutoExpireValue; requireApproval: boolean; hostManagement: boolean }) => void;
+  onApproveJoinRequest?: (deviceId: string) => void;
+  onRejectJoinRequest?: (deviceId: string) => void;
+  onLeaveRoom?: () => void;
   className?: string;
 }
 
-export function RoomSettings({ isOpen, onClose, className }: RoomSettingsProps) {
+export function RoomSettings({
+  isOpen,
+  onClose,
+  onUpdateRoomSettings,
+  onApproveJoinRequest,
+  onRejectJoinRequest,
+  onLeaveRoom,
+  className,
+}: RoomSettingsProps) {
   const currentRoom = useStore((s) => s.currentRoom);
+  const deviceId = useStore((s) => s.deviceId);
   const setRoomName = useStore((s) => s.setRoomName);
+  const setRoomSettings = useStore((s) => s.setRoomSettings);
+  const saveToHistory = useStore((s) => s.saveToHistory);
   const debugEnabled = useStore((s) => s.debugEnabled);
   const setDebugEnabled = useStore((s) => s.setDebugEnabled);
 
+  const isHost = Boolean(currentRoom?.hostDeviceId && currentRoom.hostDeviceId === deviceId);
+
   const [name, setName] = useState(currentRoom?.name ?? '');
-  const [maxMembers, setMaxMembers] = useState(8);
-  const [autoExpire, setAutoExpire] = useState<AutoExpireValue>('never');
-  const [requireApproval, setRequireApproval] = useState(false);
+  const [maxMembers, setMaxMembers] = useState(currentRoom?.settings.maxMembers ?? 8);
+  const [autoExpire, setAutoExpire] = useState<AutoExpireValue>(currentRoom?.settings.autoExpire ?? 'never');
+  const [hostManagement, setHostManagement] = useState(currentRoom?.settings.hostManagement ?? false);
+  const [requireApproval, setRequireApproval] = useState(currentRoom?.settings.requireApproval ?? false);
 
   const { copy, copied } = useCopyToClipboard<'code'>();
 
-  // Sync local name when room changes (e.g. after rejoin).
-  useEffect(() => {
-    if (currentRoom?.name != null) setName(currentRoom.name);
-  }, [currentRoom?.id, currentRoom?.name]);
-
   if (!currentRoom) return null;
+  const formKey = `${currentRoom.id}-${String(isOpen)}-${currentRoom.name ?? ''}-${currentRoom.settings.maxMembers}-${currentRoom.settings.autoExpire}-${String(currentRoom.settings.hostManagement)}-${String(currentRoom.settings.requireApproval)}`;
+
+  const canEditSettings = isHost;
 
   const handleSave = () => {
     if (name !== currentRoom.name) setRoomName(name);
+    setRoomSettings({ maxMembers, autoExpire, hostManagement, requireApproval });
+    onUpdateRoomSettings?.({ maxMembers, autoExpire, hostManagement, requireApproval });
+    saveToHistory();
     onClose();
   };
 
@@ -62,6 +80,7 @@ export function RoomSettings({ isOpen, onClose, className }: RoomSettingsProps) 
 
   return (
     <BottomSheet
+      key={formKey}
       isOpen={isOpen}
       onClose={onClose}
       title="Room settings"
@@ -72,7 +91,7 @@ export function RoomSettings({ isOpen, onClose, className }: RoomSettingsProps) 
           <Button variant="secondary" className="flex-1" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" className="flex-1" onClick={handleSave}>
+          <Button variant="primary" className="flex-1" onClick={handleSave} disabled={!canEditSettings}>
             Save changes
           </Button>
         </div>
@@ -106,7 +125,8 @@ export function RoomSettings({ isOpen, onClose, className }: RoomSettingsProps) 
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Design team, Client files"
-                className="w-full rounded-lg border border-[var(--border-soft)] bg-[var(--surface-glass)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--color-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
+                readOnly={!canEditSettings}
+                className={`w-full rounded-lg border border-[var(--border-soft)] bg-[var(--surface-glass)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--color-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] ${!canEditSettings ? 'cursor-not-allowed opacity-60' : ''}`}
               />
               <p className="mt-1 text-xs text-[var(--text-muted)]">
                 A label only you see—helps you tell rooms apart.
@@ -129,7 +149,7 @@ export function RoomSettings({ isOpen, onClose, className }: RoomSettingsProps) 
               }
               options={MAX_MEMBER_OPTIONS.map((n) => ({ value: String(n), label: String(n) }))}
               value={String(maxMembers)}
-              onChange={(v) => setMaxMembers(Number(v))}
+              onChange={(v) => canEditSettings && setMaxMembers(Number(v))}
               columns={4}
               hint={`${currentRoom.members.length} of ${maxMembers} spots used.`}
             />
@@ -142,7 +162,7 @@ export function RoomSettings({ isOpen, onClose, className }: RoomSettingsProps) 
               }
               options={[...EXPIRE_OPTIONS]}
               value={autoExpire}
-              onChange={setAutoExpire}
+              onChange={(v) => canEditSettings && setAutoExpire(v)}
               columns={4}
               size="sm"
               hint="Room closes automatically after no activity for this long."
@@ -155,12 +175,51 @@ export function RoomSettings({ isOpen, onClose, className }: RoomSettingsProps) 
           description="How join requests and data are handled."
         >
           <div className="space-y-2">
-            <SheetRow
-              icon={<Shield className="h-4 w-4" />}
-              title="Require approval"
-              subtitle="New joiners must be approved before they can see or send files."
-              action={<Switch checked={requireApproval} onChange={setRequireApproval} />}
-            />
+            {isHost && (
+              <SheetRow
+                icon={<Shield className="h-4 w-4" />}
+                title="Host management"
+                subtitle="Only you can approve join requests, remove members, and change settings."
+                action={<Switch checked={hostManagement} onChange={setHostManagement} />}
+              />
+            )}
+            {hostManagement && (
+              <SheetRow
+                icon={<Lock className="h-4 w-4" />}
+                title="Require approval"
+                subtitle="New joiners must be approved before they can see or send files."
+                action={<Switch checked={requireApproval} onChange={setRequireApproval} disabled={!isHost} />}
+              />
+            )}
+            {requireApproval && currentRoom.pendingJoinRequests.length > 0 && (
+              <div className="space-y-2 rounded-lg border border-[var(--border-soft)] bg-[var(--surface-glass)] p-3">
+                <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Pending requests</p>
+                {currentRoom.pendingJoinRequests.map((request) => (
+                  <div key={request.deviceId} className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm text-[var(--text-primary)]">{request.displayName}</p>
+                      <p className="text-xs text-[var(--text-muted)]">{request.deviceId}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => onRejectJoinRequest?.(request.deviceId)}
+                      >
+                        Reject
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        onClick={() => onApproveJoinRequest?.(request.deviceId)}
+                      >
+                        Approve
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             <SheetTip variant="info" icon={<Lock className="h-4 w-4" />}>
               <p className="text-sm font-medium text-[var(--text-primary)]">
                 End-to-end encrypted
@@ -183,6 +242,23 @@ export function RoomSettings({ isOpen, onClose, className }: RoomSettingsProps) 
             action={<Switch checked={debugEnabled} onChange={setDebugEnabled} />}
           />
         </SheetSection>
+
+        {onLeaveRoom && (
+          <div className="pt-4 mt-2 border-t border-[var(--border-soft)]">
+            <Button
+              variant="danger"
+              size="md"
+              onClick={() => {
+                onClose();
+                onLeaveRoom();
+              }}
+              className="w-full justify-center gap-2"
+            >
+              <DoorOpen className="w-4 h-4" />
+              Leave room
+            </Button>
+          </div>
+        )}
       </div>
     </BottomSheet>
   );

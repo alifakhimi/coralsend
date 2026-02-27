@@ -41,6 +41,21 @@ export interface ChatMessage {
   isMe: boolean;
 }
 
+export type AutoExpireValue = 'never' | '1h' | '24h' | '7d';
+
+export interface RoomSettings {
+  maxMembers: number;
+  autoExpire: AutoExpireValue;
+  requireApproval: boolean;
+  hostManagement: boolean;
+}
+
+export interface PendingJoinRequest {
+  deviceId: string;
+  displayName: string;
+  joinedAt: number;
+}
+
 export interface Room {
   id: string;               // Room code (e.g., ABC123)
   name?: string;            // Optional room name
@@ -49,6 +64,11 @@ export interface Room {
   members: Member[];
   files: FileMetadata[];
   messages: ChatMessage[];  // Chat messages
+  settings: RoomSettings;
+  pendingJoinRequests: PendingJoinRequest[];
+  lastActivityAt: number;
+  hostToken?: string | null;   // Server-issued token for host (creator)
+  hostDeviceId?: string | null; // Device ID of room creator/host
 }
 
 export type ConnectionStatus = 
@@ -100,12 +120,18 @@ interface AppState {
   joinRoom: (roomId: string, deviceId: string, displayName: string) => void;
   leaveRoom: () => void;
   setRoomName: (name: string) => void;
+  setRoomSettings: (settings: Partial<RoomSettings>) => void;
+  setHostToken: (token: string, deviceId: string) => void;
+  touchRoomActivity: () => void;
   
   // Actions - Members
   addMember: (member: Omit<Member, 'isMe'>) => void;
   removeMember: (deviceId: string) => void;
   updateMemberStatus: (deviceId: string, status: Member['status']) => void;
   updateMemberConnectionPath: (deviceId: string, connectionPath: ConnectionPath) => void;
+  addPendingJoinRequest: (request: PendingJoinRequest) => void;
+  removePendingJoinRequest: (deviceId: string) => void;
+  clearPendingJoinRequests: () => void;
   
   // Actions - Files
   addFile: (file: Omit<FileMetadata, 'id' | 'progress' | 'status'>, id?: string) => string;
@@ -149,6 +175,12 @@ import { generateRoomCode } from '@/lib/roomCode';
 // ============ Helpers ============
 
 const generateId = () => Math.random().toString(36).substring(2, 15);
+const DEFAULT_ROOM_SETTINGS: RoomSettings = {
+  maxMembers: 8,
+  autoExpire: 'never',
+  requireApproval: false,
+  hostManagement: false,
+};
 
 // ============ Initial State ============
 
@@ -188,8 +220,13 @@ export const useStore = create<AppState>()(
         const now = Date.now();
         const resolvedRoomId = roomId || generateRoomCode();
         const cachedFiles = get().roomFilesCache[resolvedRoomId] || [];
+        const fromHistory = get().roomHistory.find((r) => r.id === resolvedRoomId);
+        const settings: RoomSettings = fromHistory?.settings
+          ? { ...DEFAULT_ROOM_SETTINGS, ...fromHistory.settings }
+          : { ...DEFAULT_ROOM_SETTINGS };
         const room: Room = {
           id: resolvedRoomId,
+          name: fromHistory?.name,
           createdAt: now,
           joinedAt: now,
           members: [{
@@ -201,6 +238,11 @@ export const useStore = create<AppState>()(
           }],
           files: cachedFiles,
           messages: [],
+          settings,
+          pendingJoinRequests: [],
+          lastActivityAt: now,
+          hostToken: fromHistory?.hostToken ?? null,
+          hostDeviceId: fromHistory?.hostDeviceId ?? null,
         };
         set({ currentRoom: room, view: 'room', status: 'connected' });
       },
@@ -209,8 +251,13 @@ export const useStore = create<AppState>()(
       joinRoom: (roomId, deviceId, displayName) => {
         const now = Date.now();
         const cachedFiles = get().roomFilesCache[roomId] || [];
+        const fromHistory = get().roomHistory.find((r) => r.id === roomId);
+        const settings: RoomSettings = fromHistory?.settings
+          ? { ...DEFAULT_ROOM_SETTINGS, ...fromHistory.settings }
+          : { ...DEFAULT_ROOM_SETTINGS };
         const room: Room = {
           id: roomId,
+          name: fromHistory?.name,
           createdAt: now,
           joinedAt: now,
           members: [{
@@ -222,6 +269,11 @@ export const useStore = create<AppState>()(
           }],
           files: cachedFiles,
           messages: [],
+          settings,
+          pendingJoinRequests: [],
+          lastActivityAt: now,
+          hostToken: fromHistory?.hostToken ?? null,
+          hostDeviceId: fromHistory?.hostDeviceId ?? null,
         };
         set({ currentRoom: room, view: 'room', status: 'connecting' });
       },
@@ -232,15 +284,51 @@ export const useStore = create<AppState>()(
         if (currentRoom) {
           get().saveToHistory();
         }
-        set({ currentRoom: null, view: 'home', status: 'idle' });
+        set({ currentRoom: null, view: 'home', status: 'idle', error: null });
       },
 
       // Room - Set Name
       setRoomName: (name) => {
         const { currentRoom } = get();
         if (currentRoom) {
-          set({ currentRoom: { ...currentRoom, name } });
+          set({ currentRoom: { ...currentRoom, name, lastActivityAt: Date.now() } });
         }
+      },
+
+      setRoomSettings: (settings) => {
+        const { currentRoom } = get();
+        if (!currentRoom) return;
+        set({
+          currentRoom: {
+            ...currentRoom,
+            settings: { ...currentRoom.settings, ...settings },
+            lastActivityAt: Date.now(),
+          },
+        });
+      },
+
+      setHostToken: (token, deviceId) => {
+        const { currentRoom } = get();
+        if (!currentRoom) return;
+        set({
+          currentRoom: {
+            ...currentRoom,
+            hostToken: token,
+            hostDeviceId: deviceId,
+            lastActivityAt: Date.now(),
+          },
+        });
+      },
+
+      touchRoomActivity: () => {
+        const { currentRoom } = get();
+        if (!currentRoom) return;
+        set({
+          currentRoom: {
+            ...currentRoom,
+            lastActivityAt: Date.now(),
+          },
+        });
       },
 
       // Members - Add
@@ -255,6 +343,10 @@ export const useStore = create<AppState>()(
           get().updateMemberStatus(member.deviceId, member.status);
           return;
         }
+
+        if (currentRoom.members.length >= currentRoom.settings.maxMembers) {
+          return;
+        }
         
         const newMember: Member = {
           ...member,
@@ -265,6 +357,7 @@ export const useStore = create<AppState>()(
           currentRoom: {
             ...currentRoom,
             members: [...currentRoom.members, newMember],
+            lastActivityAt: Date.now(),
           },
         });
       },
@@ -278,6 +371,7 @@ export const useStore = create<AppState>()(
           currentRoom: {
             ...currentRoom,
             members: currentRoom.members.filter(m => m.deviceId !== deviceId),
+            lastActivityAt: Date.now(),
           },
         });
       },
@@ -312,6 +406,44 @@ export const useStore = create<AppState>()(
         });
       },
 
+      addPendingJoinRequest: (request) => {
+        const { currentRoom } = get();
+        if (!currentRoom) return;
+        if (currentRoom.pendingJoinRequests.some((r) => r.deviceId === request.deviceId)) return;
+        set({
+          currentRoom: {
+            ...currentRoom,
+            pendingJoinRequests: [...currentRoom.pendingJoinRequests, request],
+            lastActivityAt: Date.now(),
+          },
+        });
+      },
+
+      removePendingJoinRequest: (deviceId) => {
+        const { currentRoom } = get();
+        if (!currentRoom) return;
+        set({
+          currentRoom: {
+            ...currentRoom,
+            pendingJoinRequests: currentRoom.pendingJoinRequests.filter((r) => r.deviceId !== deviceId),
+            lastActivityAt: Date.now(),
+          },
+        });
+      },
+
+      clearPendingJoinRequests: () => {
+        const { currentRoom } = get();
+        if (!currentRoom) return;
+        if (currentRoom.pendingJoinRequests.length === 0) return;
+        set({
+          currentRoom: {
+            ...currentRoom,
+            pendingJoinRequests: [],
+            lastActivityAt: Date.now(),
+          },
+        });
+      },
+
       // Files - Add
       addFile: (file, providedId) => {
         const { currentRoom, roomFilesCache } = get();
@@ -341,6 +473,7 @@ export const useStore = create<AppState>()(
           currentRoom: {
             ...currentRoom,
             files: nextFiles,
+            lastActivityAt: Date.now(),
           },
           roomFilesCache: {
             ...roomFilesCache,
@@ -579,6 +712,7 @@ export const useStore = create<AppState>()(
           currentRoom: {
             ...currentRoom,
             messages: [...currentRoom.messages, newMessage],
+            lastActivityAt: Date.now(),
           },
         });
       },
@@ -593,7 +727,11 @@ export const useStore = create<AppState>()(
         
         // Add to beginning (most recent first)
         const updated = [
-          { ...currentRoom, members: currentRoom.members.filter(m => m.isMe) },
+          {
+            ...currentRoom,
+            members: currentRoom.members.filter(m => m.isMe),
+            pendingJoinRequests: [],
+          },
           ...filtered,
         ].slice(0, 10); // Keep only last 10 rooms
         

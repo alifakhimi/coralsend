@@ -34,7 +34,7 @@ export function SheetSection({
       {description != null && (
         <p className="mt-0.5 text-xs text-[var(--text-muted)]">{description}</p>
       )}
-      <div className={title != null || description != null ? 'flex flex-1' : undefined}>
+      <div className={title != null || description != null ? 'flex flex-1 mt-4' : undefined}>
         {children}
       </div>
     </div>

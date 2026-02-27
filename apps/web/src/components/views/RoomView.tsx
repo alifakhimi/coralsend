@@ -35,6 +35,7 @@ import {
   CheckSquare,
   RotateCcw,
   RefreshCw,
+  DoorOpen,
 } from 'lucide-react';
 
 interface RoomViewProps {
@@ -46,6 +47,10 @@ interface RoomViewProps {
   onRetryConnection?: (deviceId: string) => void;
   onCopyTextFile?: (file: FileMetadata) => Promise<boolean>;
   onRequestFileMetaSync?: () => void;
+  onUpdateRoomSettings?: (settings: { maxMembers: number; autoExpire: 'never' | '1h' | '24h' | '7d'; requireApproval: boolean; hostManagement: boolean }) => void;
+  onRemoveMember?: (deviceId: string) => void;
+  onApproveJoinRequest?: (deviceId: string) => void;
+  onRejectJoinRequest?: (deviceId: string) => void;
 }
 
 export function RoomView({
@@ -57,6 +62,10 @@ export function RoomView({
   onRetryConnection,
   onCopyTextFile,
   onRequestFileMetaSync,
+  onUpdateRoomSettings,
+  onRemoveMember,
+  onApproveJoinRequest,
+  onRejectJoinRequest,
 }: RoomViewProps) {
   const currentRoom = useStore((s) => s.currentRoom);
   const showToast = useToastStore((s) => s.showToast);
@@ -78,6 +87,8 @@ export function RoomView({
   const [pasteError, setPasteError] = useState<string | null>(null);
   const [isPasting, setIsPasting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const deviceId = useStore((s) => s.deviceId);
+  const isHost = Boolean(currentRoom?.hostDeviceId && currentRoom.hostDeviceId === deviceId);
   const shareUrl = currentRoom ? getRoomShareUrl(currentRoom.id) : '';
   const sharePayload = currentRoom ? getRoomSharePayload(currentRoom.id, shareUrl) : null;
   const { copyLink, shareLink, copiedKey } = useShareLink({
@@ -293,16 +304,29 @@ export function RoomView({
               <Share2 className="w-4 h-4" />
               <span className="hidden sm:inline">Share</span>
             </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              aria-label="Show settings"
-              title="Settings"
-              onClick={() => setShowSettings(true)}
-            >
-              <Settings className="w-4 h-4" />
-              <span className="hidden sm:inline">Settings</span>
-            </Button>
+            {isHost ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                aria-label="Show settings"
+                title="Settings"
+                onClick={() => setShowSettings(true)}
+              >
+                <Settings className="w-4 h-4" />
+                <span className="hidden sm:inline">Settings</span>
+              </Button>
+            ) : (
+              <Button
+                variant="danger"
+                size="sm"
+                aria-label="Leave room"
+                title="Leave room"
+                onClick={onLeaveRoom}
+              >
+                <DoorOpen className="w-4 h-4" />
+                <span className="hidden sm:inline">Leave</span>
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -552,6 +576,9 @@ export function RoomView({
             onShareLink={shareLink}
             memberCount={currentRoom.members.length}
             onRetryConnection={onRetryConnection}
+            onRemoveMember={onRemoveMember}
+            onApproveJoinRequest={onApproveJoinRequest}
+            onRejectJoinRequest={onRejectJoinRequest}
           />
         )}
       </BottomSheet>
@@ -581,8 +608,15 @@ export function RoomView({
         </div>
       )}
 
-      {/* Room Settings Modal */}
-      <RoomSettings isOpen={showSettings} onClose={() => setShowSettings(false)} />
+      {/* Room Settings Modal (host only) */}
+      <RoomSettings
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        onUpdateRoomSettings={onUpdateRoomSettings}
+        onApproveJoinRequest={onApproveJoinRequest}
+        onRejectJoinRequest={onRejectJoinRequest}
+        onLeaveRoom={onLeaveRoom}
+      />
 
       {/* Global drag listener */}
       <div

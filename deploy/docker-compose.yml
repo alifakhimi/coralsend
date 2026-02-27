@@ -1,8 +1,12 @@
+# Local Human Test: make docker-up
+# Uses repo root .env (copy from .env.example)
 services:
   server:
     build:
       context: ../
       dockerfile: deploy/Dockerfile.server
+    env_file:
+      - ../.env
     ports:
       - "8080:8080"
     restart: always
@@ -14,22 +18,27 @@ services:
       args:
         - NEXT_PUBLIC_SIGNALING_URL=${NEXT_PUBLIC_SIGNALING_URL:-ws://localhost:8080/ws}
         - NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH:-}
+        - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
+        - NEXT_PUBLIC_APP_VERSION=${NEXT_PUBLIC_APP_VERSION:-}
         - NEXT_PUBLIC_STUN_URL=${NEXT_PUBLIC_STUN_URL:-}
         - NEXT_PUBLIC_TURN_URL=${NEXT_PUBLIC_TURN_URL:-}
         - NEXT_PUBLIC_TURN_USER=${NEXT_PUBLIC_TURN_USER:-}
         - NEXT_PUBLIC_TURN_PASS=${NEXT_PUBLIC_TURN_PASS:-}
+        - NEXT_PUBLIC_ICE_DIAGNOSTICS=${NEXT_PUBLIC_ICE_DIAGNOSTICS:-false}
+        - NEXT_PUBLIC_GITHUB_URL=${NEXT_PUBLIC_GITHUB_URL:-}
+        - NEXT_PUBLIC_TWITTER_URL=${NEXT_PUBLIC_TWITTER_URL:-}
+        - NEXT_PUBLIC_TELEGRAM_URL=${NEXT_PUBLIC_TELEGRAM_URL:-}
+        - NEXT_PUBLIC_INSTAGRAM_URL=${NEXT_PUBLIC_INSTAGRAM_URL:-}
+        - NEXT_PUBLIC_LINKEDIN_URL=${NEXT_PUBLIC_LINKEDIN_URL:-}
+        - NEXT_PUBLIC_POSTHOG_KEY=${NEXT_PUBLIC_POSTHOG_KEY:-}
+        - NEXT_PUBLIC_POSTHOG_HOST=${NEXT_PUBLIC_POSTHOG_HOST:-https://eu.i.posthog.com}
+    env_file:
+      - ../.env
+    environment:
+      - PORT=${WEB_PORT:-3000}
+      - HOSTNAME=${WEB_HOSTNAME:-0.0.0.0}
     ports:
       - "3000:3000"
-    env_file:
-      - .env
-    environment:
-      - NEXT_PUBLIC_SIGNALING_URL=${NEXT_PUBLIC_SIGNALING_URL:-ws://localhost:8080/ws}
-      - NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH:-}
-      - NEXT_PUBLIC_STUN_URL=${NEXT_PUBLIC_STUN_URL:-}
-      - NEXT_PUBLIC_TURN_URL=${NEXT_PUBLIC_TURN_URL:-}
-      - NEXT_PUBLIC_TURN_USER=${NEXT_PUBLIC_TURN_USER:-}
-      - NEXT_PUBLIC_TURN_PASS=${NEXT_PUBLIC_TURN_PASS:-}
     depends_on:
       - server
     restart: always
-

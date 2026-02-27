@@ -2,6 +2,7 @@
 
 COMPOSE := docker compose
 COMPOSE_FILE := deploy/docker-compose.yml
+ENV_FILE := $(shell [ -f .env ] && echo --env-file .env)
 
 dev:
 	@echo "Starting development environment..."
@@ -22,11 +23,11 @@ install:
 
 docker-up:
 	@echo "Starting Docker Compose stack..."
-	@$(COMPOSE) -f $(COMPOSE_FILE) up -d
+	@$(COMPOSE) $(ENV_FILE) -f $(COMPOSE_FILE) up -d
 
 docker-build:
 	@echo "Building Docker images..."
-	@DOCKER_BUILDKIT=0 $(COMPOSE) -f $(COMPOSE_FILE) build
+	@DOCKER_BUILDKIT=0 $(COMPOSE) $(ENV_FILE) -f $(COMPOSE_FILE) build
 
 docker-down:
 	@echo "Stopping Docker Compose stack..."
@@ -35,7 +36,7 @@ docker-down:
 docker-restart:
 	@echo "Restarting Docker Compose stack..."
 	@$(COMPOSE) -f $(COMPOSE_FILE) down
-	@$(COMPOSE) -f $(COMPOSE_FILE) up -d
+	@$(COMPOSE) $(ENV_FILE) -f $(COMPOSE_FILE) up -d
 
 docker-logs:
 	@$(COMPOSE) -f $(COMPOSE_FILE) logs -f --tail=200

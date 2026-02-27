@@ -1,3 +1,5 @@
+# VPS Production: full stack with nginx
+# Uses repo root .env (copy from .env.example). Run: docker compose --env-file .env -f deploy/docker-compose.prod.yml up -d
 services:
   server:
     image: ${SERVER_IMAGE:-ghcr.io/alifakhimi/coralsend-server:latest}
@@ -5,7 +7,7 @@ services:
       context: ../
       dockerfile: deploy/Dockerfile.server
     env_file:
-      - ./.env.server
+      - ../.env
     expose:
       - "${SERVER_PORT:-8080}"
     restart: unless-stopped
@@ -39,7 +41,7 @@ services:
         - NEXT_PUBLIC_POSTHOG_KEY=${NEXT_PUBLIC_POSTHOG_KEY:-}
         - NEXT_PUBLIC_POSTHOG_HOST=${NEXT_PUBLIC_POSTHOG_HOST:-}
     env_file:
-      - ./.env.web
+      - ../.env
     environment:
       - PORT=${WEB_PORT:-3000}
       - HOSTNAME=${WEB_HOSTNAME:-0.0.0.0}
@@ -53,7 +55,7 @@ services:
   coturn:
     image: ${COTURN_IMAGE:-coturn/coturn:4.8.0}
     env_file:
-      - ./.env.coturn
+      - ../.env
     command:
       - -n
       - --log-file=stdout
@@ -79,7 +81,7 @@ services:
   nginx:
     image: ${NGINX_IMAGE:-nginx:1.27.4}
     env_file:
-      - ./.env.nginx
+      - ../.env
     restart: unless-stopped
     volumes:
       - ../conf.d:/etc/nginx/conf.d

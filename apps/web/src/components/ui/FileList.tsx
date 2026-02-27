@@ -270,7 +270,7 @@ function FileItem({
       </div>
 
       {/* Download progress bar - full width, below main row */}
-      {isInbox && (true || isDownloading) && (
+      {isInbox && isDownloading && (
         <div className="mt-3 -mx-3 min-[480px]:-mx-4 px-3 min-[480px]:px-4">
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-glass-strong)]">
             <div

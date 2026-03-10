@@ -2,7 +2,7 @@
 
 COMPOSE := docker compose
 COMPOSE_FILE := deploy/docker-compose.yml
-ENV_FILE := $(shell [ -f .env ] && echo --env-file .env)
+ENV_FILE := $(shell [ -f .env.local ] && echo --env-file .env.local)
 
 dev:
 	@echo "Starting development environment..."
@@ -10,7 +10,7 @@ dev:
 
 server:
 	@echo "Starting Signaling Server..."
-	@cd apps/server && [ -f .env ] && set -a && . ./.env && set +a; go run cmd/server/main.go -addr=:$${SERVER_PORT:-8080}
+	@cd apps/server && [ -f .env.local ] && set -a && . ./.env.local && set +a; go run cmd/server/main.go -addr=:$${SERVER_PORT:-8080}
 
 web:
 	@echo "Starting Web PWA..."
@@ -31,13 +31,13 @@ docker-build:
 
 docker-down:
 	@echo "Stopping Docker Compose stack..."
-	@$(COMPOSE) -f $(COMPOSE_FILE) down
+	@$(COMPOSE) $(ENV_FILE) -f $(COMPOSE_FILE) down
 
 docker-restart:
 	@echo "Restarting Docker Compose stack..."
-	@$(COMPOSE) -f $(COMPOSE_FILE) down
+	@$(COMPOSE) $(ENV_FILE) -f $(COMPOSE_FILE) down
 	@$(COMPOSE) $(ENV_FILE) -f $(COMPOSE_FILE) up -d
 
 docker-logs:
-	@$(COMPOSE) -f $(COMPOSE_FILE) logs -f --tail=200
+	@$(COMPOSE) $(ENV_FILE) -f $(COMPOSE_FILE) logs -f --tail=200
 

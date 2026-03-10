@@ -69,7 +69,7 @@ const BUFFER_LOW_THRESHOLD = 128 * 1024; // 128KB (2 chunks)
 const BUFFER_HIGH_THRESHOLD = 1024 * 1024; // 1MB (~16 chunks queued)
 const PROGRESS_UPDATE_BYTES = 256 * 1024; // Update UI every 256KB (avoids 0% for long time on large files)
 const THUMBNAIL_MAX_SIZE = 200; // Max thumbnail dimension
-const ICE_DIAGNOSTICS = process.env.NEXT_PUBLIC_ICE_DIAGNOSTICS === 'true';
+const ICE_DIAGNOSTICS = process.env.WEB_ICE_DIAGNOSTICS === 'true';
 
 // ============ Helpers ============
 
@@ -1033,7 +1033,7 @@ export const useWebRTC = () => {
             ws.current = null;
           }
           store.reset();
-          const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+          const basePath = process.env.WEB_BASE_PATH || '';
           window.location.assign(`${basePath}/app`);
           logger.warn('General', `Removed from room by ${removedBy}`);
           break;
@@ -1063,7 +1063,7 @@ export const useWebRTC = () => {
 
   const connect = useCallback((roomId: string, isCreator: boolean) => {
     if (removedFromRoomRef.current) {
-      const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+      const basePath = process.env.WEB_BASE_PATH || '';
       window.location.assign(`${basePath}/app`);
       return;
     }

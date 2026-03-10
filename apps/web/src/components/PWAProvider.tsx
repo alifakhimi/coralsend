@@ -11,7 +11,7 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
 
-    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+    const basePath = process.env.WEB_BASE_PATH || '';
     const swUrl = `${basePath}/sw.js`;
 
     navigator.serviceWorker

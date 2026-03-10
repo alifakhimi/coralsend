@@ -5,8 +5,8 @@ import type { AnalyticsAdapter } from './types';
 
 export class PostHogAdapter implements AnalyticsAdapter {
   init(): void {
-    const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
-    const host = process.env.NEXT_PUBLIC_POSTHOG_HOST ?? 'https://eu.i.posthog.com';
+    const key = process.env.WEB_POSTHOG_KEY;
+    const host = process.env.WEB_POSTHOG_HOST ?? 'https://eu.i.posthog.com';
     if (!key || typeof window === 'undefined') return;
     posthog.init(key, { api_host: host });
   }

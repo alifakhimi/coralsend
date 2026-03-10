@@ -4,7 +4,7 @@ import { NoopAdapter } from './noop';
 
 const hasPostHog =
   typeof process !== 'undefined' &&
-  (process.env.NEXT_PUBLIC_POSTHOG_KEY?.trim() ?? '').length > 0;
+  (process.env.WEB_POSTHOG_KEY?.trim() ?? '').length > 0;
 
 const adapter: AnalyticsAdapter = hasPostHog ? new PostHogAdapter() : new NoopAdapter();
 

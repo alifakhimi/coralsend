@@ -1,3 +1,5 @@
+import { logger } from "./logger";
+
 /** Public asset URLs (generated from coralsend-logo.png via npm run generate-assets) */
 export const ASSETS = {
   favicon16: '/favicon-16x16.png',
@@ -48,7 +50,10 @@ export function getRoomSharePayload(roomId: string, shareUrl: string): {
 
 // Get signaling server URL dynamically based on current location
 export const getSignalingServerUrl = (): string => {
-  const envUrl = process.env.NEXT_PUBLIC_SIGNALING_URL?.trim();
+  const envUrl = process.env.WEB_SIGNALING_URL?.trim();
+  logger.debug("General", `process.env:`, JSON.stringify(process.env));
+  logger.debug("General", `envUrl WEB_SIGNALING_URL ${envUrl}`);
+  
   if (envUrl) {
     return envUrl;
   }
@@ -70,10 +75,10 @@ export const getSignalingServerUrl = (): string => {
   return 'ws://localhost:8080/ws';
 };
 
-const envStunUrl = process.env.NEXT_PUBLIC_STUN_URL?.trim();
-const envTurnUrl = process.env.NEXT_PUBLIC_TURN_URL?.trim();
-const envTurnUser = process.env.NEXT_PUBLIC_TURN_USER?.trim();
-const envTurnPass = process.env.NEXT_PUBLIC_TURN_PASS?.trim();
+const envStunUrl = process.env.STUN_URL?.trim();
+const envTurnUrl = process.env.TURN_URL?.trim();
+const envTurnUser = process.env.TURN_USER?.trim();
+const envTurnPass = process.env.TURN_PASS?.trim();
 
 export const ICE_SERVERS: RTCIceServer[] = [
   { urls: envStunUrl || 'stun:stun.l.google.com:19302' },

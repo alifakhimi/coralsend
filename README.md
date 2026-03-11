@@ -186,13 +186,13 @@ cp .env.example .env
 
 **Key variables:**
 
-- `WEB_BASE_PATH`: Base path for subdirectory deployment (e.g., `/coralsend`). Leave empty for root deployment.
-- `WEB_SITE_URL`: Public site origin used for canonical metadata, sitemap, robots, and `llms.txt` URLs.
+- `NEXT_PUBLIC_BASE_PATH`: Base path for subdirectory deployment (e.g., `/coralsend`). Leave empty for root deployment.
+- `NEXT_PUBLIC_SITE_URL`: Public site origin used for canonical metadata, sitemap, robots, and `llms.txt` URLs.
 - `NEXT_PUBLIC_APP_VERSION`: App version shown in UI (falls back to `apps/web/package.json` if unset).
-- `WEB_SIGNALING_URL`: WebSocket signaling server URL (e.g., `wss://yourdomain.com/ws`). If not set, auto-detected from current URL.
-- `STUN_URL`: STUN server URL for ICE gathering.
-- `TURN_URL`, `TURN_USER`, `TURN_PASS`: TURN relay configuration.
-- `WEB_ICE_DIAGNOSTICS`: Enables additional ICE path/error logs in browser console when set to `true`.
+- `NEXT_PUBLIC_SIGNALING_URL`: WebSocket signaling server URL (e.g., `wss://yourdomain.com/ws`). If not set, auto-detected from current URL.
+- `NEXT_PUBLIC_STUN_URL`: STUN server URL for ICE gathering.
+- `NEXT_PUBLIC_TURN_URL`, `NEXT_PUBLIC_TURN_USER`, `NEXT_PUBLIC_TURN_PASS`: TURN relay configuration.
+- `NEXT_PUBLIC_ICE_DIAGNOSTICS`: Enables additional ICE path/error logs in browser console when set to `true`.
 - `NEXT_PUBLIC_GITHUB_URL` (+ optional social URLs): Used for footer/changelog social links.
 - `APP_ENV`: Runtime mode for signaling hardening (`production` enables strict origin checks).
 - `ALLOWED_ORIGINS`: Comma-separated origin allowlist for signaling HTTP CORS and WebSocket origin validation.
@@ -201,14 +201,14 @@ cp .env.example .env
 
 **Example for subdirectory deployment:**
 ```bash
-WEB_BASE_PATH=/coralsend
-WEB_SIGNALING_URL=wss://612.ir/ws
+NEXT_PUBLIC_BASE_PATH=/coralsend
+NEXT_PUBLIC_SIGNALING_URL=wss://612.ir/ws
 ```
 
 **Example for root deployment:**
 ```bash
-# Leave WEB_BASE_PATH empty or unset
-WEB_SIGNALING_URL=wss://612.ir/ws
+# Leave NEXT_PUBLIC_BASE_PATH empty or unset
+NEXT_PUBLIC_SIGNALING_URL=wss://612.ir/ws
 ```
 
 **Note:** For Docker builds, these variables must be passed as build args (see `deploy/docker-compose.yml`).
@@ -307,11 +307,11 @@ Copy `.env.example` to `.env` at repo root. A single `.env` file is used for all
 
 Edit `.env`:
 
-- `WEB_SIGNALING_URL=wss://app.example.com/ws`
-- `WEB_BASE_PATH=` for root deployment, or `/coralsend` for subdirectory deployment
-- `STUN_URL=stun:turn.example.com:3478`
-- `TURN_URL=turn:turn.example.com:3478?transport=udp`
-- `TURN_USER` / `TURN_PASS`
+- `NEXT_PUBLIC_SIGNALING_URL=wss://app.example.com/ws`
+- `NEXT_PUBLIC_BASE_PATH=` for root deployment, or `/coralsend` for subdirectory deployment
+- `NEXT_PUBLIC_STUN_URL=stun:turn.example.com:3478`
+- `NEXT_PUBLIC_TURN_URL=turn:turn.example.com:3478?transport=udp`
+- `NEXT_PUBLIC_TURN_USER` / `NEXT_PUBLIC_TURN_PASS`
 - `TURN_REALM=turn.example.com`
 - `TURN_USER` / `TURN_PASS`
 - `TURN_EXTERNAL_IP=<your_vps_public_ip>`
@@ -350,15 +350,15 @@ Expected behavior:
 
 - Use a TLS terminator (nginx + certbot or your existing ingress)
 - Once TLS is enabled, keep:
-  - `WEB_SIGNALING_URL=wss://app.example.com/ws`
+  - `NEXT_PUBLIC_SIGNALING_URL=wss://app.example.com/ws`
   - TURN as `turn:...` or `turns:...` depending on your TLS strategy for TURN
 
-### 6) Subdirectory deployment notes (`WEB_BASE_PATH`)
+### 6) Subdirectory deployment notes (`NEXT_PUBLIC_BASE_PATH`)
 
 - If app is behind `/coralsend`, set:
-  - `WEB_BASE_PATH=/coralsend`
+  - `NEXT_PUBLIC_BASE_PATH=/coralsend`
 - Ensure reverse proxy routes that path to `web:3000`.
-- `WEB_SIGNALING_URL` should still point to `/ws` on the same external domain (or a dedicated WS domain).
+- `NEXT_PUBLIC_SIGNALING_URL` should still point to `/ws` on the same external domain (or a dedicated WS domain).
 
 ### 7) Production (Dokploy, 3 separate services)
 
@@ -374,8 +374,8 @@ When deploying on Dokploy with three separate services (coturn, server, web):
 2. User B joins via URL/QR.
 3. Both clients connect to signaling over WebSocket (`/ws`) and exchange SDP/ICE.
 4. Browser ICE gathers candidates from:
-   - configured STUN (`STUN_URL`)
-   - configured TURN (`TURN_URL`, credentials)
+   - configured STUN (`NEXT_PUBLIC_STUN_URL`)
+   - configured TURN (`NEXT_PUBLIC_TURN_URL`, credentials)
 5. If direct P2P is blocked, TURN relay is used.
 6. DataChannel opens and file chunks flow browser-to-browser.
 7. Server and TURN do not store files; they facilitate connectivity/signaling only.

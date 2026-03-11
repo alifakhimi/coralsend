@@ -21,6 +21,10 @@ install:
 	@cd apps/server && go mod tidy
 	@cd apps/web && npm install
 
+generate-assets:
+	@echo "Generate web assets..."
+	@cd apps/web && npm run generate-assets
+
 docker-up:
 	@echo "Starting Docker Compose stack..."
 	@$(COMPOSE) $(ENV_FILE) -f $(COMPOSE_FILE) up -d

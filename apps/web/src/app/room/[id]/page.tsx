@@ -83,7 +83,7 @@ export default function RoomPage() {
 
     // Clean URL after reading the create flag
     if (isCreate) {
-      const basePath = process.env.WEB_BASE_PATH || '';
+      const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
       window.history.replaceState({}, '', `${basePath}/room/${extractedRoomId}`);
     }
 
@@ -108,7 +108,7 @@ export default function RoomPage() {
       clearTimeout(leaveTimeoutRef.current);
       leaveTimeoutRef.current = null;
     }
-    const basePath = process.env.WEB_BASE_PATH || '';
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
     router.push(`${basePath}/app` || '/app');
   }, [router]);
 
@@ -129,7 +129,7 @@ export default function RoomPage() {
     leaveTimeoutRef.current = setTimeout(() => {
       leaveTimeoutRef.current = null;
       if (typeof window !== 'undefined' && window.location.pathname.includes('/room/')) {
-        const basePath = process.env.WEB_BASE_PATH || '';
+        const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
         window.location.assign(`${basePath}/app` || '/app');
       }
     }, LEAVE_TIMEOUT_MS);
@@ -144,7 +144,7 @@ export default function RoomPage() {
     useStore.getState().leaveRoom();
     cleanup(savedRoomId ?? undefined);
     hasNavigatedRef.current = true;
-    const basePath = process.env.WEB_BASE_PATH || '';
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
     window.location.assign(`${basePath}/app` || '/app');
   }, [cleanup]);
 

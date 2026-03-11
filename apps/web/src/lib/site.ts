@@ -5,7 +5,7 @@ function normalizeUrl(value: string): string {
 }
 
 export function getSiteUrl(): string {
-  const envUrl = process.env.WEB_SITE_URL?.trim();
+  const envUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
   if (envUrl) {
     return normalizeUrl(envUrl);
   }

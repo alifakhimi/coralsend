@@ -51,9 +51,6 @@ export function getRoomSharePayload(roomId: string, shareUrl: string): {
 // Get signaling server URL dynamically based on current location
 export const getSignalingServerUrl = (): string => {
   const envUrl = process.env.NEXT_PUBLIC_SIGNALING_URL?.trim();
-  logger.debug("General", `process.env:`, JSON.stringify(process.env));
-  logger.debug("General", `envUrl NEXT_PUBLIC_SIGNALING_URL ${envUrl}`);
-
   if (envUrl) {
     return envUrl;
   }

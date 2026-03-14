@@ -1,0 +1,12 @@
+# Behind reverse proxy (Dokploy, K8s Ingress, Cloudflare Tunnel, etc.)
+# No nginx - server and web expose ports for external reverse proxy
+# Run: docker compose --env-file .env.local -f deploy/docker-compose.proxy.yml up -d
+include:
+  - docker-compose.base.yml
+services:
+  server:
+    ports:
+      - "${SERVER_PORT:-8080}:${SERVER_PORT:-8080}"
+  web:
+    ports:
+      - "${WEB_PORT:-3000}:${WEB_PORT:-3000}"

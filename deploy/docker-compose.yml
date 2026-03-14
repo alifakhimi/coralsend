@@ -1,106 +1,15 @@
 # VPS Production: full stack with nginx
-# Uses repo root .env.local (copy from .env.example). Run: docker compose --env-file .env.local -f deploy/docker-compose.yml up -d
+# Run: docker compose --env-file .env.local -f deploy/docker-compose.yml up -d
+include:
+  - docker-compose.base.yml
 services:
-  server:
-    image: ${SERVER_IMAGE:-ghcr.io/alifakhimi/coralsend-server:latest}
-    build:
-      context: ../
-      dockerfile: deploy/Dockerfile.server
-    # env_file:
-    #   - ../.env.local
-    environment:
-      - SERVER_PORT=${SERVER_PORT:-8080}
-      - APP_ENV=${APP_ENV:-production}
-      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
-      - HOST_SECRET=${HOST_SECRET:-SetForProduction}
-      - RATE_LIMIT_WINDOW=${RATE_LIMIT_WINDOW:-60}
-      - RATE_LIMIT_MAX_REQUESTS=${RATE_LIMIT_MAX_REQUESTS:-120}
-    expose:
-      - "${SERVER_PORT:-8080}"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:${SERVER_PORT:-8080}/health"]
-      interval: ${SERVER_HEALTHCHECK_INTERVAL:-30s}
-      timeout: ${SERVER_HEALTHCHECK_TIMEOUT:-5s}
-      retries: ${SERVER_HEALTHCHECK_RETRIES:-5}
-      start_period: ${SERVER_HEALTHCHECK_START_PERIOD:-10s}
-
-  web:
-    image: ${WEB_IMAGE:-ghcr.io/alifakhimi/coralsend-web:latest}
-    build:
-      context: ../
-      dockerfile: deploy/Dockerfile.web
-      args:
-        - NEXT_PUBLIC_APP_VERSION=${NEXT_PUBLIC_APP_VERSION:-}
-        - NEXT_PUBLIC_GITHUB_URL=${NEXT_PUBLIC_GITHUB_URL:-}
-        - NEXT_PUBLIC_TWITTER_URL=${NEXT_PUBLIC_TWITTER_URL:-}
-        - NEXT_PUBLIC_TELEGRAM_URL=${NEXT_PUBLIC_TELEGRAM_URL:-}
-        - NEXT_PUBLIC_INSTAGRAM_URL=${NEXT_PUBLIC_INSTAGRAM_URL:-}
-        - NEXT_PUBLIC_LINKEDIN_URL=${NEXT_PUBLIC_LINKEDIN_URL:-}
-        # TODO: Move to runtime
-        - NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH:-}
-        - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-}
-        - NEXT_PUBLIC_SIGNALING_URL=${NEXT_PUBLIC_SIGNALING_URL:-}
-        - NEXT_PUBLIC_STUN_URL=${NEXT_PUBLIC_STUN_URL:-}
-        - NEXT_PUBLIC_TURN_URL=${NEXT_PUBLIC_TURN_URL:-}
-        - NEXT_PUBLIC_TURN_USER=${NEXT_PUBLIC_TURN_USER:-coralsend}
-        - NEXT_PUBLIC_TURN_PASS=${NEXT_PUBLIC_TURN_PASS:-coralsend}
-        - NEXT_PUBLIC_ICE_DIAGNOSTICS=${NEXT_PUBLIC_ICE_DIAGNOSTICS:-true}
-        - NEXT_PUBLIC_POSTHOG_KEY=${NEXT_PUBLIC_POSTHOG_KEY:-}
-        - NEXT_PUBLIC_POSTHOG_HOST=${NEXT_PUBLIC_POSTHOG_HOST:-}
-    # env_file:
-    #   - ../.env.local
-    environment:
-      - PORT=${WEB_PORT:-3000}
-      - HOSTNAME=${WEB_HOSTNAME:-0.0.0.0}
-    expose:
-      - "${WEB_PORT:-3000}"
-    depends_on:
-      server:
-        condition: service_healthy
-    restart: unless-stopped
-
-  coturn:
-    image: ${COTURN_IMAGE:-coturn/coturn:4.8.0}
-    volumes:
-      # - deploy/turnserver.conf:/etc/turnserver.conf
-      - turn_data:/var/lib/turn
-    command:
-      - -n
-      - --log-file=stdout
-      - --listening-ip=${COTURN_LISTENING_IP:-0.0.0.0}
-      - --listening-port=${COTURN_LISTENING_PORT:-3478}
-      - --min-port=${COTURN_MIN_PORT:-49160}
-      - --max-port=${COTURN_MAX_PORT:-49200}
-      - --realm=${TURN_REALM:-}
-      - --lt-cred-mech
-      - --user=${TURN_USER:-coralsend}:${TURN_PASS:-coralsend}
-      - --external-ip=${TURN_EXTERNAL_IP:-120.0.0.1}
-      - --fingerprint
-      - --no-tls
-      - --no-dtls
-      - --no-cli
-    ports:
-      - "${COTURN_TLS_LISTENING_PORT:-5349}:${COTURN_TLS_LISTENING_PORT:-5349}/tcp"
-      - "${COTURN_LISTENING_PORT:-3478}:${COTURN_LISTENING_PORT:-3478}/tcp"
-      - "${COTURN_LISTENING_PORT:-3478}:${COTURN_LISTENING_PORT:-3478}/udp"
-      - "${COTURN_MIN_PORT:-49160}-${COTURN_MAX_PORT:-49200}:${COTURN_MIN_PORT:-49160}-${COTURN_MAX_PORT:-49200}/tcp"
-      - "${COTURN_MIN_PORT:-49160}-${COTURN_MAX_PORT:-49200}:${COTURN_MIN_PORT:-49160}-${COTURN_MAX_PORT:-49200}/udp"
-    restart: unless-stopped
-
   nginx:
     image: ${NGINX_IMAGE:-nginx:1.27.4}
-    # env_file:
-    #   - ../.env.local
     restart: unless-stopped
     volumes:
       - ./conf.d:/etc/nginx/conf.d:ro
     ports:
       - "${NGINX_HTTP_PORT:-80}:80"
-      # - "443:443"
     depends_on:
       - web
       - server
-
-volumes:
-  turn_data:

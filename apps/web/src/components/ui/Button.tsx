@@ -12,19 +12,19 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = 'primary', size = 'md', loading, disabled, children, ...props }, ref) => {
-    const baseStyles = 'inline-flex items-center justify-center gap-2 font-medium transition-all duration-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[var(--bg-base)] disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] cursor-pointer';
-    
+    const baseStyles = 'inline-flex flex-nowrap whitespace-nowrap items-center justify-center gap-2 font-medium transition-all duration-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[var(--bg-base)] disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] cursor-pointer';
+
     const variants = {
       primary: 'bg-[var(--color-accent-bg)] text-[var(--color-accent-text)] hover:bg-[var(--color-accent-bg-hover)] focus:ring-[var(--color-accent)] shadow-lg shadow-[var(--color-accent-border)]',
-      secondary: 'glass-strong text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] border border-[var(--border-soft)] focus:ring-[var(--color-accent)]',
+      secondary: 'glass-strong text-[var(--text-primary)] hover:bg-[var(--color-accent-subtle)] border border-[var(--border-soft)] focus:ring-[var(--color-accent)]',
       ghost: 'bg-transparent text-[var(--text-muted)] hover:bg-[var(--surface-glass)] hover:text-[var(--text-primary)] focus:ring-[var(--color-accent)]',
       danger: 'bg-[var(--color-error-bg)] text-[var(--color-error)] hover:bg-[var(--color-error-bg)] border border-[var(--color-error)] focus:ring-[var(--color-error)]',
     };
-    
+
     const sizes = {
       sm: 'px-3 py-1.5 text-sm',
-      md: 'px-4 py-2.5 text-sm',
-      lg: 'px-6 py-3 text-base',
+      md: 'px-4 py-2 text-sm',
+      lg: 'px-6 py-2.5 text-base',
       icon: 'p-2.5',
     };
 

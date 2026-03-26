@@ -197,6 +197,7 @@ cp .env.example .env
 - `APP_ENV`: Runtime mode for signaling hardening (`production` enables strict origin checks).
 - `ALLOWED_ORIGINS`: Comma-separated origin allowlist for signaling HTTP CORS and WebSocket origin validation.
 - `RATE_LIMIT_WINDOW`, `RATE_LIMIT_MAX_REQUESTS`: Basic per-IP fixed-window signaling rate limits on `/ws`.
+- `HOST_SECRET`: Secret for HMAC signing of host tokens. **Required in production**; if unset, uses a dev fallback. Set a strong random value.
 
 **Example for subdirectory deployment:**
 ```bash
@@ -211,6 +212,16 @@ NEXT_PUBLIC_SIGNALING_URL=wss://612.ir/ws
 ```
 
 **Note:** For Docker builds, these variables must be passed as build args (see `deploy/docker-compose.yml`).
+
+### Deployment stages
+
+| Stage | Command / Method | Compose / Env |
+|-------|------------------|---------------|
+| Development | `make dev` | `apps/server/.env`, `apps/web/.env.local` |
+| Local Human Test | `make docker-up` | `deploy/docker-compose.yml`, repo root `.env` |
+| Staging | Dokploy (all-in-one) | `deploy/docker-compose.dokploy.yml`, Dokploy env |
+| Production (VPS) | Docker Compose | `deploy/docker-compose.prod.yml`, repo root `.env` |
+| Production (Dokploy) | 3 separate services | See `deploy/.env.*.example` for each service |
 
 ### Run locally
 
@@ -235,6 +246,17 @@ Frontend:
 cd apps/web
 npm run dev
 ```
+
+### Local Human Test (Docker)
+
+To run the full stack in Docker (server + web) for local testing:
+
+```bash
+cp .env.example .env
+make docker-up
+```
+
+Web UI: `http://localhost:3000`, signaling: `ws://localhost:8080/ws`. Use `make docker-down` to stop.
 
 ### Test on your phone (same Wi‑Fi)
 
@@ -281,6 +303,8 @@ cd coralsend
 cp .env.example .env
 ```
 
+Copy `.env.example` to `.env` at repo root. A single `.env` file is used for all services; no need to create `deploy/.env.*` files.
+
 Edit `.env`:
 
 - `NEXT_PUBLIC_SIGNALING_URL=wss://app.example.com/ws`
@@ -289,8 +313,9 @@ Edit `.env`:
 - `NEXT_PUBLIC_TURN_URL=turn:turn.example.com:3478?transport=udp`
 - `NEXT_PUBLIC_TURN_USER` / `NEXT_PUBLIC_TURN_PASS`
 - `TURN_REALM=turn.example.com`
-- `TURN_USER` / `TURN_PASSWORD`
+- `TURN_USER` / `TURN_PASS`
 - `TURN_EXTERNAL_IP=<your_vps_public_ip>`
+- `HOST_SECRET=<strong_random_value>` (required in production for host token signing)
 - `SERVER_IMAGE` and `WEB_IMAGE` (GHCR tags, if you deploy prebuilt images)
 
 ### 3) Deploy using Docker Compose
@@ -334,6 +359,14 @@ Expected behavior:
   - `NEXT_PUBLIC_BASE_PATH=/coralsend`
 - Ensure reverse proxy routes that path to `web:3000`.
 - `NEXT_PUBLIC_SIGNALING_URL` should still point to `/ws` on the same external domain (or a dedicated WS domain).
+
+### 7) Production (Dokploy, 3 separate services)
+
+When deploying on Dokploy with three separate services (coturn, server, web):
+
+- **Coturn**: Create the service manually in Dokploy UI. Use [deploy/.env.coturn.example](deploy/.env.coturn.example) for environment variables.
+- **Server**: Build from [deploy/Dockerfile.server](deploy/Dockerfile.server). Use [deploy/.env.server.example](deploy/.env.server.example) for environment variables (e.g. `ALLOWED_ORIGINS`, `HOST_SECRET`).
+- **Web**: Build from [deploy/Dockerfile.web](deploy/Dockerfile.web). Pass `NEXT_PUBLIC_*` as build args in Dokploy; see [deploy/.env.web.example](deploy/.env.web.example) for the full list.
 
 ## Runtime behavior (step-by-step)
 

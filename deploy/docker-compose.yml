@@ -1,35 +1,15 @@
+# VPS Production: full stack with nginx
+# Run: docker compose --env-file .env.local -f deploy/docker-compose.yml up -d
+include:
+  - docker-compose.base.yml
 services:
-  server:
-    build:
-      context: ../
-      dockerfile: deploy/Dockerfile.server
+  nginx:
+    image: ${NGINX_IMAGE:-nginx:1.27.4}
+    restart: unless-stopped
+    volumes:
+      - ./conf.d:/etc/nginx/conf.d:ro
     ports:
-      - "8080:8080"
-    restart: always
-
-  web:
-    build:
-      context: ../
-      dockerfile: deploy/Dockerfile.web
-      args:
-        - NEXT_PUBLIC_SIGNALING_URL=${NEXT_PUBLIC_SIGNALING_URL:-ws://localhost:8080/ws}
-        - NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH:-}
-        - NEXT_PUBLIC_STUN_URL=${NEXT_PUBLIC_STUN_URL:-}
-        - NEXT_PUBLIC_TURN_URL=${NEXT_PUBLIC_TURN_URL:-}
-        - NEXT_PUBLIC_TURN_USER=${NEXT_PUBLIC_TURN_USER:-}
-        - NEXT_PUBLIC_TURN_PASS=${NEXT_PUBLIC_TURN_PASS:-}
-    ports:
-      - "3000:3000"
-    env_file:
-      - .env
-    environment:
-      - NEXT_PUBLIC_SIGNALING_URL=${NEXT_PUBLIC_SIGNALING_URL:-ws://localhost:8080/ws}
-      - NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH:-}
-      - NEXT_PUBLIC_STUN_URL=${NEXT_PUBLIC_STUN_URL:-}
-      - NEXT_PUBLIC_TURN_URL=${NEXT_PUBLIC_TURN_URL:-}
-      - NEXT_PUBLIC_TURN_USER=${NEXT_PUBLIC_TURN_USER:-}
-      - NEXT_PUBLIC_TURN_PASS=${NEXT_PUBLIC_TURN_PASS:-}
+      - "${NGINX_HTTP_PORT:-80}:80"
     depends_on:
+      - web
       - server
-    restart: always
-

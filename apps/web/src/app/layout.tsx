@@ -1,21 +1,21 @@
 import type { Metadata, Viewport } from 'next';
-import { DM_Sans, JetBrains_Mono } from 'next/font/google';
+// import { DM_Sans, JetBrains_Mono } from 'next/font/google';
 import { ASSETS } from '@/lib/constants';
 import { getSiteUrl } from '@/lib/site';
 import { PWAProvider } from '@/components/PWAProvider';
 import './globals.css';
 
-const dmSans = DM_Sans({
-  subsets: ['latin'],
-  variable: '--font-dm-sans',
-  display: 'swap',
-});
+// const dmSans = DM_Sans({
+//   subsets: ['latin'],
+//   variable: '--font-dm-sans',
+//   display: 'swap',
+// });
 
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
-  variable: '--font-jetbrains-mono',
-  display: 'swap',
-});
+// const jetbrainsMono = JetBrains_Mono({
+//   subsets: ['latin'],
+//   variable: '--font-jetbrains-mono',
+//   display: 'swap',
+// });
 
 const siteUrl = getSiteUrl();
 
@@ -87,7 +87,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${dmSans.variable} ${jetbrainsMono.variable}`}>
+    <html lang="en" suppressHydrationWarning /* className={`${dmSans.variable} ${jetbrainsMono.variable}`} */>
       <head>
         <script
           dangerouslySetInnerHTML={{

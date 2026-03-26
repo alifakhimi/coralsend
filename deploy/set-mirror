@@ -1,0 +1,10 @@
+#!/bin/sh
+
+DEBIAN_CODENAME=bookworm # $(lsb_release -cs)
+
+rm -rf /etc/apt/sources.list.d/
+
+tee /etc/apt/sources.list > /dev/null <<EOF
+deb http://mirror-linux.runflare.com/debian ${DEBIAN_CODENAME} main
+# deb http://mirror-linux.runflare.com/debian-security ${DEBIAN_CODENAME}-security main
+EOF

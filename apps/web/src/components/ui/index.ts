@@ -14,9 +14,23 @@ export { RoomHistory } from './RoomHistory';
 export { Chat, ChatMessages, ChatInput } from './Chat';
 export type { ChatMessage } from './Chat';
 export { RoomSettings } from './RoomSettings';
+export { ShareRoomSheet } from './ShareRoomSheet';
+export type { ShareRoomSheetProps } from './ShareRoomSheet';
+export { ShareLinkButtons } from './ShareLinkButtons';
+export type { ShareLinkButtonsProps } from './ShareLinkButtons';
+export { Copyable } from './Copyable';
+export type { CopyableProps } from './Copyable';
 export { SocialLinks } from './SocialLinks';
 export { ActionCard } from './ActionCard';
 export { ThemeToggle } from './ThemeToggle';
 export { Switch } from './Switch';
 export { ActionButton } from './ActionButton';
 export { ToastContainer } from './Toast';
+export {
+  SheetSection,
+  SheetRow,
+  CopyableField,
+  SegmentGroup,
+  SheetTip,
+} from './Sheet';
+export type { SegmentOption } from './Sheet';

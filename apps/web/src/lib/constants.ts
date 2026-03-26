@@ -1,3 +1,5 @@
+import { logger } from "./logger";
+
 /** Public asset URLs (generated from coralsend-logo.png via npm run generate-assets) */
 export const ASSETS = {
   favicon16: '/favicon-16x16.png',
@@ -24,6 +26,27 @@ export const getBaseUrl = (): string => {
   }
   return '';
 };
+
+/** Full URL to join or share a room. Use for QR codes, copy link, Web Share, etc. */
+export function getRoomShareUrl(roomId: string): string {
+  return `${getBaseUrl()}/room/${roomId}`;
+}
+
+/** Default title for room share (Web Share API). */
+export const ROOM_SHARE_TITLE = 'CoralSend Room';
+
+/** Build structured payload for room share: title, message text, and URL. */
+export function getRoomSharePayload(roomId: string, shareUrl: string): {
+  title: string;
+  text: string;
+  url: string;
+} {
+  return {
+    title: ROOM_SHARE_TITLE,
+    text: `Join my room to receive files: ${roomId}\n${shareUrl}`,
+    url: shareUrl,
+  };
+}
 
 // Get signaling server URL dynamically based on current location
 export const getSignalingServerUrl = (): string => {

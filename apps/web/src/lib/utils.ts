@@ -8,12 +8,12 @@ export function cn(...inputs: ClassValue[]) {
 // Format file size to human readable
 export function formatFileSize(bytes: number): string {
   if (bytes === 0) return '0 B';
-  
+
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
 // Format transfer speed (bytes/sec) to human readable
@@ -52,14 +52,14 @@ export function isValidUUID(str: string): boolean {
 // Extract room ID from URL or text
 export function extractRoomId(text: string): string | null {
   const trimmed = text.trim();
-  
+
   // If it contains /room/{id} path (from QR code or share link - full or relative URL)
   const pathMatch = trimmed.match(/\/room\/([A-Z0-9a-f-]+)/i);
   if (pathMatch) {
     const id = pathMatch[1];
     return isValidUUID(id) ? id : id.toUpperCase();
   }
-  
+
   // If it's a URL with room parameter (?room=...)
   if (trimmed.includes('room=')) {
     try {
@@ -71,17 +71,17 @@ export function extractRoomId(text: string): string | null {
       return match ? match[1].toUpperCase() : null;
     }
   }
-  
+
   // If it's a direct UUID
   if (isValidUUID(trimmed)) {
     return trimmed;
   }
-  
+
   // If it's a 6-character room code
   if (/^[A-Za-z0-9]{6}$/.test(trimmed)) {
     return trimmed.toUpperCase();
   }
-  
+
   return null;
 }
 

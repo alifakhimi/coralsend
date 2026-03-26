@@ -1,5 +1,12 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { useStore, type Member, type FileMetadata, type ChatMessage, type ConnectionPath } from '@/store/store';
+import {
+  useStore,
+  type Member,
+  type FileMetadata,
+  type ChatMessage,
+  type ConnectionPath,
+  type AutoExpireValue,
+} from '@/store/store';
 import { analytics } from '@/lib/analytics';
 import { getSignalingServerUrl, ICE_SERVERS } from '@/lib/constants';
 import { getDeviceId, getShortName } from '@/lib/deviceId';
@@ -40,6 +47,13 @@ type ChatMessagePayload = {
   timestamp: number;
 };
 
+type RoomSettingsPayload = {
+  maxMembers: number;
+  autoExpire: AutoExpireValue;
+  requireApproval: boolean;
+  hostManagement: boolean;
+};
+
 type FileIdentity = {
   name: string;
   size: number;
@@ -53,6 +67,7 @@ const FILE_ID_HEADER = 36;
 const CHUNK_SIZE = 64 * 1024; // 64KB payload (+ 36B header stays well under 256KB maxMessageSize)
 const BUFFER_LOW_THRESHOLD = 128 * 1024; // 128KB (2 chunks)
 const BUFFER_HIGH_THRESHOLD = 1024 * 1024; // 1MB (~16 chunks queued)
+const PROGRESS_UPDATE_BYTES = 256 * 1024; // Update UI every 256KB (avoids 0% for long time on large files)
 const THUMBNAIL_MAX_SIZE = 200; // Max thumbnail dimension
 const ICE_DIAGNOSTICS = process.env.NEXT_PUBLIC_ICE_DIAGNOSTICS === 'true';
 
@@ -176,6 +191,7 @@ async function detectIcePath(pc: RTCPeerConnection, remoteDeviceId: string): Pro
 
 export const useWebRTC = () => {
   const ws = useRef<WebSocket | null>(null);
+  const removedFromRoomRef = useRef(false);
 
   // Multi-peer connections: deviceId -> RTCPeerConnection
   const peers = useRef<Map<string, RTCPeerConnection>>(new Map());
@@ -183,7 +199,7 @@ export const useWebRTC = () => {
 
   // File transfer state
   const pendingFiles = useRef<Map<string, File>>(new Map()); // fileId -> File
-  const incomingChunks = useRef<Map<string, { meta: FileMetadataPayload; chunks: ArrayBuffer[]; receivedBytes: number; startTime: number }>>(new Map());
+  const incomingChunks = useRef<Map<string, { meta: FileMetadataPayload; chunks: ArrayBuffer[]; receivedBytes: number; startTime: number; lastUpdateBytes?: number }>>(new Map());
   const earlyChunks = useRef<Map<string, ArrayBuffer[]>>(new Map()); // chunks arriving before file-start
   const receivedFileBlobs = useRef<Map<string, Blob>>(new Map()); // fileId -> Blob (text files only, for copy)
   const requestModes = useRef<Map<string, 'download' | 'copy'>>(new Map()); // requester intent by fileId
@@ -192,7 +208,7 @@ export const useWebRTC = () => {
 
   // ============ Cleanup ============
 
-  const cleanup = useCallback(() => {
+  const cleanup = useCallback((roomIdOverride?: string) => {
     sendAbortControllers.current.forEach((ac) => ac.abort());
     sendAbortControllers.current.clear();
 
@@ -203,6 +219,16 @@ export const useWebRTC = () => {
     // Close all peer connections
     peers.current.forEach((pc) => pc.close());
     peers.current.clear();
+
+    // Send explicit leave before closing so server removes us immediately
+    const roomId = roomIdOverride ?? useStore.getState().currentRoom?.id;
+    if (ws.current?.readyState === WebSocket.OPEN && roomId) {
+      try {
+        ws.current.send(JSON.stringify({ type: 'leave', roomId }));
+      } catch {
+        // ignore
+      }
+    }
 
     // Close WebSocket and clear handlers to prevent state updates after cleanup
     if (ws.current) {
@@ -299,7 +325,7 @@ export const useWebRTC = () => {
 
           const buffered = earlyChunks.current.get(meta.id);
           const receivedBytes = buffered ? buffered.reduce((s, c) => s + c.byteLength, 0) : 0;
-          incomingChunks.current.set(meta.id, { meta, chunks: buffered ?? [], receivedBytes, startTime: Date.now() });
+          incomingChunks.current.set(meta.id, { meta, chunks: buffered ?? [], receivedBytes, startTime: Date.now(), lastUpdateBytes: 0 });
           earlyChunks.current.delete(meta.id);
           if (buffered) {
             logger.info('Transfer', `Flushed ${buffered.length} early chunks (${receivedBytes} bytes)`, meta.id);
@@ -378,9 +404,13 @@ export const useWebRTC = () => {
         incoming.receivedBytes += chunk.byteLength;
         const progress = Math.min(100, Math.round((incoming.receivedBytes / incoming.meta.size) * 100));
 
-        // Throttle UI store updates to 1% steps
+        // Update UI: every 256KB received or 1% progress (avoids 0% for long time on large files)
+        const lastUpdateBytes = incoming.lastUpdateBytes ?? 0;
+        const bytesSinceLastUpdate = incoming.receivedBytes - lastUpdateBytes;
         const prevProgress = store.currentRoom?.files.find(f => f.id === fileId)?.progress ?? 0;
-        if (progress >= 100 || progress - prevProgress >= 1) {
+        const shouldUpdate = progress >= 100 || progress - prevProgress >= 1 || bytesSinceLastUpdate >= PROGRESS_UPDATE_BYTES;
+        if (shouldUpdate) {
+          incoming.lastUpdateBytes = incoming.receivedBytes;
           const elapsed = (Date.now() - incoming.startTime) / 1000;
           const speed = elapsed > 0 ? incoming.receivedBytes / elapsed : 0;
           const remaining = incoming.meta.size - incoming.receivedBytes;
@@ -655,6 +685,7 @@ export const useWebRTC = () => {
 
               if (!existingMember) {
                 // New member - add to list
+                store.removePendingJoinRequest(m.deviceId);
                 store.addMember({
                   deviceId: m.deviceId,
                   displayName: m.displayName,
@@ -716,6 +747,7 @@ export const useWebRTC = () => {
             if (!existingMember) {
               // New member - add to list
               console.log('Member joined:', member.displayName);
+              store.removePendingJoinRequest(member.deviceId);
               store.addMember({
                 deviceId: member.deviceId,
                 displayName: member.displayName,
@@ -924,6 +956,89 @@ export const useWebRTC = () => {
           break;
         }
 
+        case 'room-settings': {
+          const settings = msg.payload as RoomSettingsPayload;
+          store.setRoomSettings(settings);
+          break;
+        }
+
+        case 'join-request': {
+          const request = msg.payload as MemberPayload;
+          if (request.deviceId !== myDeviceId) {
+            store.addPendingJoinRequest({
+              deviceId: request.deviceId,
+              displayName: request.displayName,
+              joinedAt: request.joinedAt,
+            });
+          }
+          break;
+        }
+
+        case 'join-request-resolved': {
+          const payload = msg.payload as { requesterId?: string };
+          if (payload.requesterId) {
+            store.removePendingJoinRequest(payload.requesterId);
+          }
+          break;
+        }
+
+        case 'host-assigned': {
+          const payload = msg.payload as { token?: string; deviceId?: string };
+          if (payload?.token && payload?.deviceId) {
+            store.setHostToken(payload.token, payload.deviceId);
+          }
+          break;
+        }
+
+        case 'join-pending': {
+          store.setStatus('connecting');
+          store.setError('Waiting for approval from a room member');
+          break;
+        }
+
+        case 'join-approved': {
+          store.setError(null);
+          store.setStatus('connected');
+          break;
+        }
+
+        case 'join-rejected': {
+          store.setStatus('error');
+          store.setError('Your join request was rejected');
+          break;
+        }
+
+        case 'room-full': {
+          store.setStatus('error');
+          store.setError('Room is full');
+          break;
+        }
+
+        case 'room-expired': {
+          const payload = msg.payload as { reason?: string };
+          const reason = payload?.reason ?? 'expired';
+          store.setStatus('error');
+          store.setError(reason === 'host_left' ? 'Host left the room' : 'Room expired due to inactivity');
+          break;
+        }
+
+        case 'member-removed': {
+          const payload = msg.payload as { removedBy?: string };
+          const removedBy = payload?.removedBy ?? 'another member';
+          removedFromRoomRef.current = true;
+          if (ws.current) {
+            ws.current.onclose = null;
+            ws.current.onmessage = null;
+            ws.current.close();
+            ws.current = null;
+          }
+          store.reset();
+          const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+          window.location.assign(`${basePath}/app`);
+          logger.warn('General', `Removed from room by ${removedBy}`);
+          break;
+        }
+
         case 'chat': {
           // Received chat message
           const chatMsg = msg.payload as ChatMessagePayload;
@@ -947,6 +1062,12 @@ export const useWebRTC = () => {
   // ============ Connection ============
 
   const connect = useCallback((roomId: string, isCreator: boolean) => {
+    if (removedFromRoomRef.current) {
+      const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+      window.location.assign(`${basePath}/app`);
+      return;
+    }
+
     const deviceId = getDeviceId();
     const displayName = getShortName(deviceId);
 
@@ -969,7 +1090,12 @@ export const useWebRTC = () => {
     ws.current.onopen = () => {
       logger.info('Signaling', 'WebSocket connected');
 
-      const joinPayload = { deviceId, displayName };
+      const roomSettings = useStore.getState().currentRoom?.settings;
+      const joinPayload = {
+        deviceId,
+        displayName,
+        settings: roomSettings ?? undefined,
+      };
       ws.current?.send(JSON.stringify({
         type: 'join',
         roomId,
@@ -1134,6 +1260,64 @@ export const useWebRTC = () => {
       type: 'file-meta-sync-request',
       roomId: room.id,
       payload: { requesterId: store.deviceId },
+    }));
+  }, []);
+
+  const updateRoomSettings = useCallback((settings: RoomSettingsPayload) => {
+    const store = useStore.getState();
+    const room = store.currentRoom;
+    if (!room) return;
+    store.setRoomSettings(settings);
+    const payload: RoomSettingsPayload & { hostToken?: string } = { ...settings };
+    if (room.settings.hostManagement && room.hostToken && room.hostDeviceId === store.deviceId) {
+      payload.hostToken = room.hostToken;
+    }
+    ws.current?.send(JSON.stringify({
+      type: 'room-settings',
+      roomId: room.id,
+      payload,
+    }));
+  }, []);
+
+  const approveJoinRequest = useCallback((deviceId: string) => {
+    const store = useStore.getState();
+    const room = store.currentRoom;
+    if (!room) return;
+    if (!room.settings.hostManagement || room.hostDeviceId !== store.deviceId || !room.hostToken) return;
+    store.removePendingJoinRequest(deviceId);
+    ws.current?.send(JSON.stringify({
+      type: 'join-approved',
+      roomId: room.id,
+      targetId: deviceId,
+      payload: { requesterId: deviceId, hostToken: room.hostToken },
+    }));
+  }, []);
+
+  const rejectJoinRequest = useCallback((deviceId: string) => {
+    const store = useStore.getState();
+    const room = store.currentRoom;
+    if (!room) return;
+    if (!room.settings.hostManagement || room.hostDeviceId !== store.deviceId || !room.hostToken) return;
+    store.removePendingJoinRequest(deviceId);
+    ws.current?.send(JSON.stringify({
+      type: 'join-rejected',
+      roomId: room.id,
+      targetId: deviceId,
+      payload: { requesterId: deviceId, hostToken: room.hostToken },
+    }));
+  }, []);
+
+  const removeMemberFromRoom = useCallback((deviceId: string) => {
+    const store = useStore.getState();
+    const room = store.currentRoom;
+    if (!room) return;
+    if (deviceId === store.deviceId) return;
+    if (!room.settings.hostManagement || room.hostDeviceId !== store.deviceId || !room.hostToken) return;
+    ws.current?.send(JSON.stringify({
+      type: 'member-remove',
+      roomId: room.id,
+      targetId: deviceId,
+      payload: { targetId: deviceId, hostToken: room.hostToken },
     }));
   }, []);
 
@@ -1383,5 +1567,9 @@ export const useWebRTC = () => {
     cleanup,
     retryConnection,
     copyTextFile,
+    updateRoomSettings,
+    removeMemberFromRoom,
+    approveJoinRequest,
+    rejectJoinRequest,
   };
 };

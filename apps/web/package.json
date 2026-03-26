@@ -20,6 +20,7 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "tailwind-merge": "^3.4.0",
+    "use-fit-text": "^2.4.0",
     "uuid": "^13.0.0",
     "zustand": "^5.0.9"
   },

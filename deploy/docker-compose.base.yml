@@ -48,6 +48,22 @@ services:
     environment:
       - PORT=${WEB_PORT:-3000}
       - HOSTNAME=${WEB_HOSTNAME:-0.0.0.0}
+      - NEXT_PUBLIC_APP_VERSION=${NEXT_PUBLIC_APP_VERSION:-}
+      - NEXT_PUBLIC_GITHUB_URL=${NEXT_PUBLIC_GITHUB_URL:-}
+      - NEXT_PUBLIC_TWITTER_URL=${NEXT_PUBLIC_TWITTER_URL:-}
+      - NEXT_PUBLIC_TELEGRAM_URL=${NEXT_PUBLIC_TELEGRAM_URL:-}
+      - NEXT_PUBLIC_INSTAGRAM_URL=${NEXT_PUBLIC_INSTAGRAM_URL:-}
+      - NEXT_PUBLIC_LINKEDIN_URL=${NEXT_PUBLIC_LINKEDIN_URL:-}
+      - NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH:-}
+      - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-}
+      - NEXT_PUBLIC_SIGNALING_URL=${NEXT_PUBLIC_SIGNALING_URL:-}
+      - NEXT_PUBLIC_STUN_URL=${NEXT_PUBLIC_STUN_URL:-}
+      - NEXT_PUBLIC_TURN_URL=${NEXT_PUBLIC_TURN_URL:-}
+      - NEXT_PUBLIC_TURN_USER=${NEXT_PUBLIC_TURN_USER:-coralsend}
+      - NEXT_PUBLIC_TURN_PASS=${NEXT_PUBLIC_TURN_PASS:-coralsend}
+      - NEXT_PUBLIC_ICE_DIAGNOSTICS=${NEXT_PUBLIC_ICE_DIAGNOSTICS:-true}
+      - NEXT_PUBLIC_POSTHOG_KEY=${NEXT_PUBLIC_POSTHOG_KEY:-}
+      - NEXT_PUBLIC_POSTHOG_HOST=${NEXT_PUBLIC_POSTHOG_HOST:-}
     expose:
       - "${WEB_PORT:-3000}"
     depends_on:
@@ -57,8 +73,10 @@ services:
 
   coturn:
     image: ${COTURN_IMAGE:-coturn/coturn:4.8.0}
-    volumes:
-      - turn_data:/var/lib/turn
+    restart: unless-stopped
+    # volumes:
+    #   - ./turnserver.conf:/etc/turnserver.conf:ro
+    #   - turn_data:/var/lib/turn
     command:
       - -n
       - --log-file=stdout
@@ -71,16 +89,24 @@ services:
       - --user=${TURN_USER:-coralsend}:${TURN_PASS:-coralsend}
       - --external-ip=${TURN_EXTERNAL_IP:-120.0.0.1}
       - --fingerprint
-      - --no-tls
       - --no-dtls
+      - --no-tls
       - --no-cli
+      # - --no-rfc5780
+      # - --web-admin
+      # - --web-admin-ip=94.182.93.20
+      # - --web-admin-port=8080
+      # - --no-stun-backward-compatibility
+      # - --response-origin-only-with-rfc5780
+      # - --Verbose
     ports:
       - "${COTURN_TLS_LISTENING_PORT:-5349}:${COTURN_TLS_LISTENING_PORT:-5349}/tcp"
       - "${COTURN_LISTENING_PORT:-3478}:${COTURN_LISTENING_PORT:-3478}/tcp"
       - "${COTURN_LISTENING_PORT:-3478}:${COTURN_LISTENING_PORT:-3478}/udp"
       - "${COTURN_MIN_PORT:-49160}-${COTURN_MAX_PORT:-49200}:${COTURN_MIN_PORT:-49160}-${COTURN_MAX_PORT:-49200}/tcp"
       - "${COTURN_MIN_PORT:-49160}-${COTURN_MAX_PORT:-49200}:${COTURN_MIN_PORT:-49160}-${COTURN_MAX_PORT:-49200}/udp"
-    restart: unless-stopped
+    # network_mode: host
+    # user: root
 
 volumes:
   turn_data:

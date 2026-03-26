@@ -3,7 +3,7 @@ FROM node:20-alpine AS base
 FROM base AS deps
 WORKDIR /app
 COPY apps/web/package.json apps/web/package-lock.json ./
-RUN npm config set registry https://mirror-npm.runflare.com
+# RUN npm config set registry https://hub.megan.ir/npm
 RUN npm ci
 
 FROM base AS builder

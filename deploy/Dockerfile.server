@@ -2,7 +2,7 @@ FROM golang:1.24 AS builder
 
 WORKDIR /app
 
-RUN go env -w GOPROXY=https://mirror-go.runflare.com/
+# RUN go env -w GOPROXY=https://hub.megan.ir/go,direct
 
 COPY apps/server/go.mod apps/server/go.sum ./
 RUN go mod download

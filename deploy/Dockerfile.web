@@ -2,14 +2,14 @@ FROM node:20-alpine AS base
 
 FROM base AS deps
 WORKDIR /app
-COPY apps/web/package.json apps/web/package-lock.json ./
+COPY apps/app/package.json apps/app/package-lock.json ./
 # RUN npm config set registry https://hub.megan.ir/npm
 RUN npm ci
 
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY apps/web/ .
+COPY apps/app/ .
 
 # Allow build-time environment variables
 ARG NEXT_PUBLIC_APP_VERSION

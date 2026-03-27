@@ -49,7 +49,7 @@ CoralSend uses a split licensing model:
 
 ### Components
 
-- `apps/web`: Next.js (App Router) PWA frontend
+- `apps/app`: Next.js (App Router) PWA frontend
 - `apps/server`: Go WebSocket signaling server
 
 ### Communication diagrams
@@ -188,7 +188,7 @@ cp .env.example .env
 
 - `NEXT_PUBLIC_BASE_PATH`: Base path for subdirectory deployment (e.g., `/coralsend`). Leave empty for root deployment.
 - `NEXT_PUBLIC_SITE_URL`: Public site origin used for canonical metadata, sitemap, robots, and `llms.txt` URLs.
-- `NEXT_PUBLIC_APP_VERSION`: App version shown in UI (falls back to `apps/web/package.json` if unset).
+- `NEXT_PUBLIC_APP_VERSION`: App version shown in UI (falls back to `apps/app/package.json` if unset).
 - `NEXT_PUBLIC_SIGNALING_URL`: WebSocket signaling server URL (e.g., `wss://yourdomain.com/ws`). If not set, auto-detected from current URL.
 - `NEXT_PUBLIC_STUN_URL`: STUN server URL for ICE gathering.
 - `NEXT_PUBLIC_TURN_URL`, `NEXT_PUBLIC_TURN_USER`, `NEXT_PUBLIC_TURN_PASS`: TURN relay configuration.
@@ -217,7 +217,7 @@ NEXT_PUBLIC_SIGNALING_URL=wss://612.ir/ws
 
 | Stage | Command / Method | Compose / Env |
 |-------|------------------|---------------|
-| Development | `make dev` | `apps/server/.env`, `apps/web/.env.local` |
+| Development | `make dev` | `apps/server/.env`, `apps/app/.env.local` |
 | Local Human Test | `make docker-up` | `deploy/docker-compose.yml`, repo root `.env` |
 | Staging | Dokploy (all-in-one) | `deploy/docker-compose.dokploy.yml`, Dokploy env |
 | Production (VPS) | Docker Compose | `deploy/docker-compose.prod.yml`, repo root `.env` |
@@ -243,7 +243,7 @@ go run cmd/server/main.go
 Frontend:
 
 ```bash
-cd apps/web
+cd apps/app
 npm run dev
 ```
 
@@ -263,7 +263,7 @@ Web UI: `http://localhost:3000`, signaling: `ws://localhost:8080/ws`. Use `make 
 To test from a mobile device, your Next.js dev server must listen on all interfaces:
 
 ```bash
-cd apps/web
+cd apps/app
 npm run dev -- -H 0.0.0.0
 ```
 

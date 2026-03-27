@@ -4,7 +4,7 @@
 
 CoralSend consists of:
 
-- Web client (`apps/web`) running in user browsers.
+- Web client (`apps/app`) running in user browsers.
 - Signaling server (`apps/server`) over WebSocket.
 - TURN/STUN service for WebRTC connectivity.
 - Optional analytics sink (PostHog) from client events.

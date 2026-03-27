@@ -4,9 +4,9 @@ node_modules
 .gitignore
 *.md
 .DS_Store
-apps/web/.next
-apps/web/node_modules
-# apps/web/.env*
+apps/app/.next
+apps/app/node_modules
+# apps/app/.env*
 apps/server/server
 apps/server/*.test.go
 *.log

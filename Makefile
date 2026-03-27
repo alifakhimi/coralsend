@@ -14,16 +14,16 @@ server:
 
 web:
 	@echo "Starting Web PWA..."
-	@cd apps/web && npm run dev
+	@cd apps/app && npm run dev
 
 install:
 	@echo "Installing dependencies..."
 	@cd apps/server && go mod tidy
-	@cd apps/web && npm install
+	@cd apps/app && npm install
 
 generate-assets:
 	@echo "Generate web assets..."
-	@cd apps/web && npm run generate-assets
+	@cd apps/app && npm run generate-assets
 
 docker-up:
 	@echo "Starting Docker Compose stack..."

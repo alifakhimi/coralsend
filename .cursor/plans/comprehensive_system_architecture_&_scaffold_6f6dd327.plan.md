@@ -70,7 +70,7 @@ sequenceDiagram
 
 ### B. Component Stack
 
-#### 1. Frontend (apps/web)
+#### 1. Frontend (apps/app)
 
 - **Framework:** Next.js 14+ (App Router)
 - **Language:** TypeScript
@@ -100,7 +100,7 @@ sequenceDiagram
 
 ### Phase 1: Foundation (Scaffold)
 
-- Set up Monorepo structure (`apps/web`, `apps/server`).
+- Set up Monorepo structure (`apps/app`, `apps/server`).
 - Configure Docker Compose for local dev.
 - Create shared types (if possible via JSON schema or manual sync).
 

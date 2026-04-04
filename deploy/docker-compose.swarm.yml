@@ -35,29 +35,29 @@ services:
         - traefik.http.services.coralsend-ws-svc.loadbalancer.server.port=${SERVER_PORT:-8080}
         - traefik.docker.network=${TRAEFIK_NETWORK:-dokploy-network}
 
-  web:
+  app:
     networks:
       - traefik
     labels:
       - traefik.enable=true
-      - traefik.http.routers.coralsend-web.rule=Host(`${TRAEFIK_HOST:-coralsend.local}`)
-      - traefik.http.routers.coralsend-web.priority=1
-      - traefik.http.routers.coralsend-web.service=coralsend-web-svc
-      - traefik.http.routers.coralsend-web.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}
-      - traefik.http.routers.coralsend-web.tls=true
-      - traefik.http.routers.coralsend-web.tls.certresolver=${TRAEFIK_TLS_CERTRESOLVER:-letsencrypt}
-      - traefik.http.services.coralsend-web-svc.loadbalancer.server.port=${WEB_PORT:-3000}
+      - traefik.http.routers.coralsend-app.rule=Host(`${TRAEFIK_HOST:-coralsend.local}`)
+      - traefik.http.routers.coralsend-app.priority=1
+      - traefik.http.routers.coralsend-app.service=coralsend-app-svc
+      - traefik.http.routers.coralsend-app.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}
+      - traefik.http.routers.coralsend-app.tls=true
+      - traefik.http.routers.coralsend-app.tls.certresolver=${TRAEFIK_TLS_CERTRESOLVER:-letsencrypt}
+      - traefik.http.services.coralsend-app-svc.loadbalancer.server.port=${WEB_PORT:-3000}
       - traefik.docker.network=${TRAEFIK_NETWORK:-dokploy-network}
     deploy:
       labels:
         - traefik.enable=true
-        - traefik.http.routers.coralsend-web.rule=Host(`${TRAEFIK_HOST:-coralsend.local}`)
-        - traefik.http.routers.coralsend-web.priority=1
-        - traefik.http.routers.coralsend-web.service=coralsend-web-svc
-        - traefik.http.routers.coralsend-web.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}
-        - traefik.http.routers.coralsend-web.tls=true
-        - traefik.http.routers.coralsend-web.tls.certresolver=${TRAEFIK_TLS_CERTRESOLVER:-letsencrypt}
-        - traefik.http.services.coralsend-web-svc.loadbalancer.server.port=${WEB_PORT:-3000}
+        - traefik.http.routers.coralsend-app.rule=Host(`${TRAEFIK_HOST:-coralsend.local}`)
+        - traefik.http.routers.coralsend-app.priority=1
+        - traefik.http.routers.coralsend-app.service=coralsend-app-svc
+        - traefik.http.routers.coralsend-app.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}
+        - traefik.http.routers.coralsend-app.tls=true
+        - traefik.http.routers.coralsend-app.tls.certresolver=${TRAEFIK_TLS_CERTRESOLVER:-letsencrypt}
+        - traefik.http.services.coralsend-app-svc.loadbalancer.server.port=${WEB_PORT:-3000}
         - traefik.docker.network=${TRAEFIK_NETWORK:-dokploy-network}
 
   coturn:

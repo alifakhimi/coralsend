@@ -134,7 +134,7 @@ sequenceDiagram
 ```text
 coralsend/
 ├── apps/
-│   ├── web/                 # Next.js
+│   ├── app/                 # Next.js
 │   │   ├── src/
 │   │   │   ├── components/  # UI Components
 │   │   │   ├── hooks/       # useWebRTC, useSignaling

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Generate all web assets from apps/app/public/coralsend-logo.png
+ * Generate all app assets from apps/app/public/coralsend-logo.png
  * Run from repo root: node apps/app/scripts/generate-assets.mjs
  */
 

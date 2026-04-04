@@ -586,7 +586,7 @@ export const useWebRTC = () => {
     pc.onicecandidateerror = (event) => {
       if (ICE_DIAGNOSTICS) {
         console.warn(
-          `[ICE][${remoteDeviceId}] candidate error: ${event.errorCode} ${event.errorText} (${event.url || 'no-url'})`
+          `[ICE][${remoteDeviceId}] candidate error: ${event.errorCode} ${event.errorText} (${event.url || 'no-url'}) raw:`, event
         );
       }
     };

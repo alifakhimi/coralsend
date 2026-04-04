@@ -77,17 +77,19 @@ const envTurnUrl = process.env.NEXT_PUBLIC_TURN_URL?.trim();
 const envTurnUser = process.env.NEXT_PUBLIC_TURN_USER?.trim();
 const envTurnPass = process.env.NEXT_PUBLIC_TURN_PASS?.trim();
 
-export const ICE_SERVERS: RTCIceServer[] = [
-  { urls: envStunUrl || 'stun:stun.l.google.com:19302' },
-];
+const envICEUrls = [envStunUrl || 'stun:stun.l.google.com:19302']
 
 if (envTurnUrl && envTurnUser && envTurnPass) {
-  ICE_SERVERS.push({
-    urls: envTurnUrl,
+  envICEUrls.push(envTurnUrl);
+}
+
+export const ICE_SERVERS: RTCIceServer[] = [
+  {
+    urls: envICEUrls,
     username: envTurnUser,
     credential: envTurnPass,
-  });
-}
+  },
+];
 
 /** App version (injected at build from package.json or env) */
 export const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || '0.0.0';

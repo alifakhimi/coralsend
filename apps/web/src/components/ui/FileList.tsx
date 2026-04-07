@@ -169,11 +169,7 @@ function FileItem({
                 </span>
               </>
             )}
-            <span aria-hidden>·</span>
-            <span className="inline-flex items-center gap-1">
-              <Clock className="w-3 h-3" aria-hidden />
-              {new Date(file.uploadedAt).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit' })}
-            </span>
+
           </div>
 
           {/* Outbox: who is downloading */}

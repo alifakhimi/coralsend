@@ -169,7 +169,7 @@ function FileItem({
                 </span>
               </>
             )}
-
+            {/* timestamp removed: was confusing when adding files */}
           </div>
 
           {/* Outbox: who is downloading */}

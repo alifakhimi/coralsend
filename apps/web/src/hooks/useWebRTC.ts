@@ -199,7 +199,7 @@ export const useWebRTC = () => {
 
   // File transfer state
   const pendingFiles = useRef<Map<string, File>>(new Map()); // fileId -> File
-  const incomingChunks = useRef<Map<string, { meta: FileMetadataPayload; chunks: ArrayBuffer[]; receivedBytes: number; startTime: number; lastUpdateBytes?: number }>>(new Map());
+  const incomingChunks = useRef<Map<string, { meta: FileMetadataPayload; chunks: (ArrayBuffer | Blob)[]; receivedBytes: number; startTime: number; lastUpdateBytes?: number }>>(new Map());
   const earlyChunks = useRef<Map<string, ArrayBuffer[]>>(new Map()); // chunks arriving before file-start
   const receivedFileBlobs = useRef<Map<string, Blob>>(new Map()); // fileId -> Blob (text files only, for copy)
   const requestModes = useRef<Map<string, 'download' | 'copy'>>(new Map()); // requester intent by fileId
@@ -272,7 +272,7 @@ export const useWebRTC = () => {
     URL.revokeObjectURL(url);
   }, []);
 
-  const finalizeReceivedFile = useCallback(async (fileId: string, meta: FileMetadataPayload, chunks: ArrayBuffer[]) => {
+  const finalizeReceivedFile = useCallback(async (fileId: string, meta: FileMetadataPayload, chunks: (ArrayBuffer | Blob)[]) => {
     const blob = new Blob(chunks, { type: meta.type });
     if (meta.type.startsWith('text/')) {
       receivedFileBlobs.current.set(fileId, blob);
@@ -325,7 +325,7 @@ export const useWebRTC = () => {
 
           const buffered = earlyChunks.current.get(meta.id);
           const receivedBytes = buffered ? buffered.reduce((s, c) => s + c.byteLength, 0) : 0;
-          incomingChunks.current.set(meta.id, { meta, chunks: buffered ?? [], receivedBytes, startTime: Date.now(), lastUpdateBytes: 0 });
+          incomingChunks.current.set(meta.id, { meta, chunks: buffered ? [...buffered] : [], receivedBytes, startTime: Date.now(), lastUpdateBytes: 0 });
           earlyChunks.current.delete(meta.id);
           if (buffered) {
             logger.info('Transfer', `Flushed ${buffered.length} early chunks (${receivedBytes} bytes)`, meta.id);
@@ -402,6 +402,13 @@ export const useWebRTC = () => {
       if (incoming) {
         incoming.chunks.push(chunk);
         incoming.receivedBytes += chunk.byteLength;
+
+        // Periodically merge ArrayBuffers into a Blob to offload memory to browser's disk backing
+        if (incoming.chunks.length >= 160) {
+          const mergedBlob = new Blob(incoming.chunks, { type: incoming.meta.type });
+          incoming.chunks = [mergedBlob];
+        }
+
         const progress = Math.min(100, Math.round((incoming.receivedBytes / incoming.meta.size) * 100));
 
         // Update UI: every 256KB received or 1% progress (avoids 0% for long time on large files)
@@ -1351,9 +1358,8 @@ export const useWebRTC = () => {
         },
       }));
 
-      // Read and send chunks
-      const buffer = await file.arrayBuffer();
-      const totalBytes = buffer.byteLength;
+      // Read and send chunks incrementally without loading the full file in memory
+      const totalBytes = file.size;
       let offset = 0;
       const encoder = new TextEncoder();
       const fileIdBytes = encoder.encode(fileId.padEnd(FILE_ID_HEADER, ' '));
@@ -1363,47 +1369,46 @@ export const useWebRTC = () => {
       sendBuf.set(fileIdBytes, 0);
       let lastSenderProgress = 0;
 
-      const sendChunk = (): Promise<void> => {
-        return new Promise((resolve, reject) => {
-          const send = () => {
-            try {
-              while (offset < totalBytes) {
-                if (ac.signal.aborted) {
-                  reject(new Error('Cancelled'));
-                  return;
+      const sendChunk = async () => {
+        while (offset < totalBytes) {
+          if (ac.signal.aborted) throw new Error('Cancelled');
+          if (dc.readyState !== 'open') throw new Error('DataChannel closed');
+
+          if (dc.bufferedAmount > BUFFER_HIGH_THRESHOLD) {
+            await new Promise<void>((resolve) => {
+              const check = () => {
+                if (dc.bufferedAmount <= BUFFER_LOW_THRESHOLD || dc.readyState !== 'open' || ac.signal.aborted) {
+                  dc.onbufferedamountlow = null;
+                  resolve();
                 }
+              };
+              dc.onbufferedamountlow = check;
+              check();
+            });
+            // Re-check after await
+            if (ac.signal.aborted) throw new Error('Cancelled');
+            if (dc.readyState !== 'open') throw new Error('DataChannel closed');
+          }
 
-                if (dc.bufferedAmount > BUFFER_HIGH_THRESHOLD) {
-                  dc.onbufferedamountlow = () => {
-                    dc.onbufferedamountlow = null;
-                    send();
-                  };
-                  return;
-                }
+          const end = Math.min(offset + CHUNK_SIZE, totalBytes);
+          const chunkBlob = file.slice(offset, end);
+          const chunkBuffer = await chunkBlob.arrayBuffer();
+          const chunkLen = chunkBuffer.byteLength;
 
-                const end = Math.min(offset + CHUNK_SIZE, totalBytes);
-                const chunkLen = end - offset;
+          if (ac.signal.aborted) throw new Error('Cancelled');
+          if (dc.readyState !== 'open') throw new Error('DataChannel closed');
 
-                // Reuse pre-allocated buffer: copy chunk data after the 36-byte header
-                sendBuf.set(new Uint8Array(buffer, offset, chunkLen), FILE_ID_HEADER);
-                dc.send(sendBuf.buffer.slice(0, FILE_ID_HEADER + chunkLen));
+          sendBuf.set(new Uint8Array(chunkBuffer), FILE_ID_HEADER);
+          dc.send(sendBuf.buffer.slice(0, FILE_ID_HEADER + chunkLen));
 
-                offset = end;
+          offset = end;
 
-                // Sender-side progress (throttled to 1% steps)
-                const senderProgress = Math.min(100, Math.round((offset / totalBytes) * 100));
-                if (senderProgress >= 100 || senderProgress - lastSenderProgress >= 1) {
-                  lastSenderProgress = senderProgress;
-                  store.updateFileDownloaderProgress(fileId, targetDeviceId, senderProgress);
-                }
-              }
-              resolve();
-            } catch (err) {
-              reject(err);
-            }
-          };
-          send();
-        });
+          const senderProgress = Math.min(100, Math.round((offset / totalBytes) * 100));
+          if (senderProgress >= 100 || senderProgress - lastSenderProgress >= 1) {
+            lastSenderProgress = senderProgress;
+            store.updateFileDownloaderProgress(fileId, targetDeviceId, senderProgress);
+          }
+        }
       };
 
       await sendChunk();

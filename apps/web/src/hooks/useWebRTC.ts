@@ -203,6 +203,8 @@ export const useWebRTC = () => {
   const earlyChunks = useRef<Map<string, ArrayBuffer[]>>(new Map()); // chunks arriving before file-start
   const receivedFileBlobs = useRef<Map<string, Blob>>(new Map()); // fileId -> Blob (text files only, for copy)
   const requestModes = useRef<Map<string, 'download' | 'copy'>>(new Map()); // requester intent by fileId
+  const fileWriters = useRef<Map<string, any>>(new Map()); // fileId -> FileSystemWritableFileStream
+  const writeQueues = useRef<Map<string, Promise<void>>>(new Map()); // fileId -> Sequential Write Promise
   const sendAbortControllers = useRef<Map<string, AbortController>>(new Map()); // `${fileId}-${targetDeviceId}` -> AbortController
   const lastProgressReported = useRef<Map<string, number>>(new Map()); // fileId -> last % sent to sender
 
@@ -244,6 +246,8 @@ export const useWebRTC = () => {
     pendingFiles.current.clear();
     receivedFileBlobs.current.clear();
     requestModes.current.clear();
+    fileWriters.current.clear();
+    writeQueues.current.clear();
     lastProgressReported.current.clear();
 
     useStore.getState().reset();
@@ -350,7 +354,21 @@ export const useWebRTC = () => {
             });
             logger.info('Transfer', `File transfer complete: ${incoming.meta.name}`);
             store.updateFileStatus(fileId, 'completed');
-            void finalizeReceivedFile(fileId, incoming.meta, incoming.chunks);
+            
+            const writer = fileWriters.current.get(fileId);
+            if (writer) {
+              const prevWrite = writeQueues.current.get(fileId) || Promise.resolve();
+              prevWrite.then(async () => {
+                await writer.close();
+                fileWriters.current.delete(fileId);
+                writeQueues.current.delete(fileId);
+              }).catch(err => console.error('Writer close err', err));
+              // File is already saved directly to disk, so we skip Blob extraction & triggerDownload
+              requestModes.current.delete(fileId);
+            } else {
+              void finalizeReceivedFile(fileId, incoming.meta, incoming.chunks);
+            }
+            
             // Auto-hide downloaded inbox file after a short delay (moves to trash)
             setTimeout(() => {
               const f = useStore.getState().currentRoom?.files.find((x) => x.id === fileId);
@@ -400,13 +418,20 @@ export const useWebRTC = () => {
 
       const incoming = incomingChunks.current.get(fileId);
       if (incoming) {
-        incoming.chunks.push(chunk);
         incoming.receivedBytes += chunk.byteLength;
 
-        // Periodically merge ArrayBuffers into a Blob to offload memory to browser's disk backing
-        if (incoming.chunks.length >= 160) {
-          const mergedBlob = new Blob(incoming.chunks, { type: incoming.meta.type });
-          incoming.chunks = [mergedBlob];
+        const writer = fileWriters.current.get(fileId);
+        if (writer) {
+          const prevWrite = writeQueues.current.get(fileId) || Promise.resolve();
+          const currentWrite = prevWrite.then(() => writer.write(chunk));
+          writeQueues.current.set(fileId, currentWrite);
+        } else {
+          incoming.chunks.push(chunk);
+          // Periodically merge ArrayBuffers into a Blob to offload memory to browser's disk backing
+          if (incoming.chunks.length >= 160) {
+            const mergedBlob = new Blob(incoming.chunks, { type: incoming.meta.type });
+            incoming.chunks = [mergedBlob];
+          }
         }
 
         const progress = Math.min(100, Math.round((incoming.receivedBytes / incoming.meta.size) * 100));
@@ -1218,10 +1243,22 @@ export const useWebRTC = () => {
   }, []);
 
   // Request a file, with preferred completion mode for text files.
-  const requestFile = useCallback((file: FileMetadata, mode: 'download' | 'copy' = 'download') => {
+  const requestFile = useCallback(async (file: FileMetadata, mode: 'download' | 'copy' = 'download') => {
     const store = useStore.getState();
     const room = store.currentRoom;
     if (!room || !store.deviceId) return;
+
+    if (mode === 'download' && 'showSaveFilePicker' in window) {
+      try {
+        const handle = await (window as any).showSaveFilePicker({ suggestedName: file.name });
+        const writable = await handle.createWritable();
+        fileWriters.current.set(file.id, writable);
+      } catch (err) {
+        // User cancelled picker, abort download request fully
+        if ((err as Error).name === 'AbortError') return;
+        logger.warn('Transfer', `showSaveFilePicker error: ${err}`);
+      }
+    }
 
     console.log('Requesting file:', file.name, 'from', file.uploaderId);
     requestModes.current.set(file.id, mode);

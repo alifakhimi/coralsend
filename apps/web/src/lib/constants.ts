@@ -60,8 +60,15 @@ export const getSignalingServerUrl = (): string => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const hostname = window.location.hostname;
 
-    // If localhost or 127.0.0.1, use port 8080
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    // If localhost, 127.0.0.1, or a local network IP, use port 8080 for signaling
+    const isLocalNetwork = 
+      hostname === 'localhost' || 
+      hostname === '127.0.0.1' || 
+      /^192\.168\./.test(hostname) || 
+      /^10\./.test(hostname) || 
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname);
+
+    if (isLocalNetwork) {
       return `${protocol}//${hostname}:8080/ws`;
     }
 

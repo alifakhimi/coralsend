@@ -75,10 +75,18 @@ export function RoomView({
   const restoreFiles = useStore((s) => s.restoreFiles);
   const emptyTrashByDirection = useStore((s) => s.emptyTrashByDirection);
   const purgeFiles = useStore((s) => s.purgeFiles);
+  const deviceId = useStore((s) => s.deviceId);
+  const isHost = Boolean(currentRoom?.hostDeviceId && currentRoom.hostDeviceId === deviceId);
+  // Read creator status from sessionStorage — written by createRoomAndNavigate before navigation.
+  // This is the only signal that survives hard refreshes, React Strict Mode double-invocation,
+  // store resets from cleanup(), and reconnect calls that always pass isCreator=false.
+  const isCreator =
+    typeof window !== 'undefined' &&
+    sessionStorage.getItem(`coralsend:creator:${currentRoom?.id}`) === '1';
   const [showChat, setShowChat] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [activeTab, setActiveTab] = useState<'inbox' | 'outbox'>('inbox');
+  const [activeTab, setActiveTab] = useState<'inbox' | 'outbox'>(isCreator ? 'outbox' : 'inbox');
   const [showTrash, setShowTrash] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
@@ -87,8 +95,6 @@ export function RoomView({
   const [pasteError, setPasteError] = useState<string | null>(null);
   const [isPasting, setIsPasting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const deviceId = useStore((s) => s.deviceId);
-  const isHost = Boolean(currentRoom?.hostDeviceId && currentRoom.hostDeviceId === deviceId);
   const shareUrl = currentRoom ? getRoomShareUrl(currentRoom.id) : '';
   const sharePayload = currentRoom ? getRoomSharePayload(currentRoom.id, shareUrl) : null;
   const { copyLink, shareLink, copiedKey } = useShareLink({

@@ -21,6 +21,15 @@ export default function RoomPage() {
   const leaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasNavigatedRef = useRef(false);
   const normalizedRoomId = extractRoomId(roomId) || roomId.toUpperCase();
+  // Read ?create=true once at mount time and persist it in a ref.
+  // Refs survive React Strict Mode's double-invocation of effects, so the
+  // value stays correct even after cleanup() wipes window.location.search
+  // via replaceState on the first effect run.
+  const isCreatorRef = useRef(
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('create') === 'true'
+      : false
+  );
 
   const {
     shareFile,
@@ -75,14 +84,16 @@ export default function RoomPage() {
       return;
     }
 
-    // Check if this is a create request
-    const searchParams = new URLSearchParams(window.location.search);
-    const isCreate = searchParams.get('create') === 'true';
+    // Use the ref (set once at mount) instead of re-reading window.location.search.
+    // Re-reading fails in React Strict Mode: the first effect run cleans the URL via
+    // replaceState, so the second run would see no ?create=true and incorrectly
+    // call joinRoom instead of createRoom.
+    const isCreate = isCreatorRef.current;
 
     console.log('Joining room from URL:', extractedRoomId, isCreate ? '(creating)' : '(joining)');
 
-    // Clean URL after reading the create flag
-    if (isCreate) {
+    // Clean URL (once) after reading the create flag
+    if (isCreate && typeof window !== 'undefined' && window.location.search.includes('create=true')) {
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
       window.history.replaceState({}, '', `${basePath}/room/${extractedRoomId}`);
     }

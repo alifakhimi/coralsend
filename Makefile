@@ -3,7 +3,10 @@
 COMPOSE := docker compose
 COMPOSE_FILE := deploy/docker-compose.yml
 COMPOSE_COTURN_FILE := deploy/docker-compose.coturn.yml
-ENV_FILE := $(shell [ -f .env.local ] && echo --env-file .env.local)
+ROOT_DIR := $(shell git rev-parse --show-toplevel 2>/dev/null || pwd)
+PROJECT_NAME ?= $(notdir $(ROOT_DIR))
+COMPOSE_PROJECT := --project-name $(PROJECT_NAME)
+ENV_FILE := $(if $(wildcard .env.local),--env-file .env.local,)
 
 dev:
 	@echo "Starting development environment..."
@@ -28,42 +31,43 @@ generate-assets:
 
 coturn-up:
 	@echo "Starting coTURN stack..."
-	@$(COMPOSE) $(ENV_FILE) -f $(COMPOSE_COTURN_FILE) up -d
+	@$(COMPOSE) $(COMPOSE_PROJECT) $(ENV_FILE) -f $(COMPOSE_COTURN_FILE) up -d
 
 coturn-down:
 	@echo "Stopping coTURN stack..."
-	@$(COMPOSE) $(ENV_FILE) -f $(COMPOSE_COTURN_FILE) down
+	@$(COMPOSE) $(COMPOSE_PROJECT) $(ENV_FILE) -f $(COMPOSE_COTURN_FILE) down
 
 docker-up-coturn:
 	@echo "Starting Docker Compose stack with coTURN..."
-	@$(COMPOSE) $(ENV_FILE) -f $(COMPOSE_FILE) -f $(COMPOSE_COTURN_FILE) up -d
+	@$(COMPOSE) $(COMPOSE_PROJECT) $(ENV_FILE) -f $(COMPOSE_FILE) -f $(COMPOSE_COTURN_FILE) up -d
 
 docker-down-coturn:
 	@echo "Stopping Docker Compose stack with coTURN..."
-	@$(COMPOSE) $(ENV_FILE) -f $(COMPOSE_FILE) -f $(COMPOSE_COTURN_FILE) down
+	@$(COMPOSE) $(COMPOSE_PROJECT) $(ENV_FILE) -f $(COMPOSE_FILE) -f $(COMPOSE_COTURN_FILE) down
 
 docker-restart-coturn:
 	@echo "Restarting Docker Compose stack with coTURN..."
-	@$(COMPOSE) $(ENV_FILE) -f $(COMPOSE_FILE) -f $(COMPOSE_COTURN_FILE) down
-	@$(COMPOSE) $(ENV_FILE) -f $(COMPOSE_FILE) -f $(COMPOSE_COTURN_FILE) up -d
+	@$(COMPOSE) $(COMPOSE_PROJECT) $(ENV_FILE) -f $(COMPOSE_FILE) -f $(COMPOSE_COTURN_FILE) down
+	@$(COMPOSE) $(COMPOSE_PROJECT) $(ENV_FILE) -f $(COMPOSE_FILE) -f $(COMPOSE_COTURN_FILE) up -d
 
 docker-up:
 	@echo "Starting Docker Compose stack..."
-	@$(COMPOSE) $(ENV_FILE) -f $(COMPOSE_FILE) up -d
+	@echo $(COMPOSE_PROJECT)
+	@$(COMPOSE) $(COMPOSE_PROJECT) $(ENV_FILE) -f $(COMPOSE_FILE) up -d
 
 docker-build:
 	@echo "Building Docker images..."
-	@DOCKER_BUILDKIT=0 $(COMPOSE) $(ENV_FILE) -f $(COMPOSE_FILE) build
+	@DOCKER_BUILDKIT=0 $(COMPOSE) $(COMPOSE_PROJECT) $(ENV_FILE) -f $(COMPOSE_FILE) build
 
 docker-down:
 	@echo "Stopping Docker Compose stack..."
-	@$(COMPOSE) $(ENV_FILE) -f $(COMPOSE_FILE) down
+	@$(COMPOSE) $(COMPOSE_PROJECT) $(ENV_FILE) -f $(COMPOSE_FILE) down
 
 docker-restart:
 	@echo "Restarting Docker Compose stack..."
-	@$(COMPOSE) $(ENV_FILE) -f $(COMPOSE_FILE) down
-	@$(COMPOSE) $(ENV_FILE) -f $(COMPOSE_FILE) up -d
+	@$(COMPOSE) $(COMPOSE_PROJECT) $(ENV_FILE) -f $(COMPOSE_FILE) down
+	@$(COMPOSE) $(COMPOSE_PROJECT) $(ENV_FILE) -f $(COMPOSE_FILE) up -d
 
 docker-logs:
-	@$(COMPOSE) $(ENV_FILE) -f $(COMPOSE_FILE) logs -f --tail=200
+	@$(COMPOSE) $(COMPOSE_PROJECT) $(ENV_FILE) -f $(COMPOSE_FILE) logs -f --tail=200
 

@@ -3,7 +3,6 @@ FROM node:20-alpine AS base
 FROM base AS deps
 WORKDIR /app
 COPY apps/app/package.json apps/app/package-lock.json ./
-RUN npm config set registry https://hub.megan.ir/npm
 RUN npm ci
 
 FROM base AS builder

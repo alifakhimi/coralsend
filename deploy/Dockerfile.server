@@ -2,8 +2,6 @@ FROM golang:1.24 AS builder
 
 WORKDIR /app
 
-RUN go env -w GOPROXY=https://hub.megan.ir/go,direct
-
 COPY apps/server/go.mod apps/server/go.sum ./
 RUN go mod download
 
@@ -13,9 +11,6 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/server
 FROM debian:bookworm-slim
 
 WORKDIR /root/
-
-RUN rm -rf /etc/apt/sources.list.d/* && \
-    echo "deb http://mirror.arvancloud.ir/debian bookworm main" > /etc/apt/sources.list
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends ca-certificates curl && \

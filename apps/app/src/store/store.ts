@@ -71,10 +71,10 @@ export interface Room {
   hostDeviceId?: string | null; // Device ID of room creator/host
 }
 
-export type ConnectionStatus = 
-  | 'idle' 
-  | 'connecting' 
-  | 'connected' 
+export type ConnectionStatus =
+  | 'idle'
+  | 'connecting'
+  | 'connected'
   | 'error'
   | 'disconnected';
 
@@ -85,36 +85,36 @@ export type AppView = 'home' | 'room';
 interface AppState {
   // Device
   deviceId: string | null;
-  
+
   // Current view
   view: AppView;
-  
+
   // Connection
   status: ConnectionStatus;
   error: string | null;
-  
+
   // Current room
   currentRoom: Room | null;
-  
+
   // Room history (persisted)
   roomHistory: Room[];
   // Persisted local files per room
   roomFilesCache: Record<string, FileMetadata[]>;
-  
+
   // File downloaders (fileId -> list of {deviceId, displayName}) - not persisted
   fileDownloaders: Record<string, Array<{ deviceId: string; displayName: string }>>;
   fileDownloaderProgress: Record<string, Record<string, number>>;
-  
+
   // Actions - Device
   setDeviceId: (id: string) => void;
-  
+
   // Actions - View
   setView: (view: AppView) => void;
-  
+
   // Actions - Connection
   setStatus: (status: ConnectionStatus) => void;
   setError: (error: string | null) => void;
-  
+
   // Actions - Room
   createRoom: (roomId: string, deviceId: string, displayName: string) => void;
   joinRoom: (roomId: string, deviceId: string, displayName: string) => void;
@@ -123,7 +123,7 @@ interface AppState {
   setRoomSettings: (settings: Partial<RoomSettings>) => void;
   setHostToken: (token: string, deviceId: string) => void;
   touchRoomActivity: () => void;
-  
+
   // Actions - Members
   addMember: (member: Omit<Member, 'isMe'>) => void;
   removeMember: (deviceId: string) => void;
@@ -132,7 +132,7 @@ interface AppState {
   addPendingJoinRequest: (request: PendingJoinRequest) => void;
   removePendingJoinRequest: (deviceId: string) => void;
   clearPendingJoinRequests: () => void;
-  
+
   // Actions - Files
   addFile: (file: Omit<FileMetadata, 'id' | 'progress' | 'status'>, id?: string) => string;
   updateFileProgress: (fileId: string, progress: number) => void;
@@ -147,25 +147,28 @@ interface AppState {
   addFileDownloader: (fileId: string, deviceId: string, displayName: string) => void;
   removeFileDownloader: (fileId: string, deviceId: string) => void;
   updateFileDownloaderProgress: (fileId: string, deviceId: string, progress: number) => void;
-  
+
   // Actions - Chat
   addMessage: (message: Omit<ChatMessage, 'id'>) => void;
-  
+
   // Actions - History
   saveToHistory: () => void;
   rejoinFromHistory: (roomId: string) => Room | null;
   removeFromHistory: (roomId: string) => void;
   clearHistory: () => void;
-  
+
   // Settings
   debugEnabled: boolean;
   setDebugEnabled: (enabled: boolean) => void;
+
+  // Whether the user created the current room (not persisted — derived from create vs join flow)
+  createdCurrentRoom: boolean;
 
   // Pending share (from PWA share_target; not persisted)
   pendingShareFiles: File[];
   setPendingShareFiles: (files: File[]) => void;
   clearPendingShareFiles: () => void;
-  
+
   // Actions - Reset
   reset: () => void;
 }
@@ -195,6 +198,7 @@ const initialState = {
   fileDownloaders: {} as Record<string, Array<{ deviceId: string; displayName: string }>>,
   fileDownloaderProgress: {} as Record<string, Record<string, number>>,
   debugEnabled: false,
+  createdCurrentRoom: false,
   pendingShareFiles: [] as File[],
 };
 
@@ -244,7 +248,7 @@ export const useStore = create<AppState>()(
           hostToken: fromHistory?.hostToken ?? null,
           hostDeviceId: fromHistory?.hostDeviceId ?? null,
         };
-        set({ currentRoom: room, view: 'room', status: 'connected' });
+        set({ currentRoom: room, view: 'room', status: 'connected', createdCurrentRoom: true });
       },
 
       // Room - Join
@@ -275,7 +279,7 @@ export const useStore = create<AppState>()(
           hostToken: fromHistory?.hostToken ?? null,
           hostDeviceId: fromHistory?.hostDeviceId ?? null,
         };
-        set({ currentRoom: room, view: 'room', status: 'connecting' });
+        set({ currentRoom: room, view: 'room', status: 'connecting', createdCurrentRoom: false });
       },
 
       // Room - Leave
@@ -284,7 +288,7 @@ export const useStore = create<AppState>()(
         if (currentRoom) {
           get().saveToHistory();
         }
-        set({ currentRoom: null, view: 'home', status: 'idle', error: null });
+        set({ currentRoom: null, view: 'home', status: 'idle', error: null, createdCurrentRoom: false });
       },
 
       // Room - Set Name
@@ -335,7 +339,7 @@ export const useStore = create<AppState>()(
       addMember: (member) => {
         const { currentRoom, deviceId } = get();
         if (!currentRoom) return;
-        
+
         // Check if member already exists
         const exists = currentRoom.members.find(m => m.deviceId === member.deviceId);
         if (exists) {
@@ -347,12 +351,12 @@ export const useStore = create<AppState>()(
         if (currentRoom.members.length >= currentRoom.settings.maxMembers) {
           return;
         }
-        
+
         const newMember: Member = {
           ...member,
           isMe: member.deviceId === deviceId,
         };
-        
+
         set({
           currentRoom: {
             ...currentRoom,
@@ -366,7 +370,7 @@ export const useStore = create<AppState>()(
       removeMember: (deviceId) => {
         const { currentRoom } = get();
         if (!currentRoom) return;
-        
+
         set({
           currentRoom: {
             ...currentRoom,
@@ -380,7 +384,7 @@ export const useStore = create<AppState>()(
       updateMemberStatus: (deviceId, status) => {
         const { currentRoom } = get();
         if (!currentRoom) return;
-        
+
         set({
           currentRoom: {
             ...currentRoom,
@@ -448,7 +452,7 @@ export const useStore = create<AppState>()(
       addFile: (file, providedId) => {
         const { currentRoom, roomFilesCache } = get();
         if (!currentRoom) return '';
-        
+
         const id = providedId || generateId();
         const newFile: FileMetadata = {
           id,
@@ -464,7 +468,7 @@ export const useStore = create<AppState>()(
           status: 'available',
           trashed: false,
         };
-        
+
         const nextFiles = currentRoom.files.some((f) => f.id === id)
           ? currentRoom.files.map((f) => (f.id === id ? { ...f, ...newFile } : f))
           : [...currentRoom.files, newFile];
@@ -480,7 +484,7 @@ export const useStore = create<AppState>()(
             [currentRoom.id]: nextFiles,
           },
         });
-        
+
         return id;
       },
 
@@ -542,8 +546,8 @@ export const useStore = create<AppState>()(
         const { [fileId]: __, ...restProgress } = fileDownloaderProgress;
         const nextFiles = shouldTrash
           ? currentRoom.files.map((f) =>
-              f.id === fileId ? { ...f, trashed: true, trashedAt: Date.now() } : f
-            )
+            f.id === fileId ? { ...f, trashed: true, trashedAt: Date.now() } : f
+          )
           : currentRoom.files.filter((f) => f.id !== fileId);
         set({
           currentRoom: {
@@ -673,16 +677,16 @@ export const useStore = create<AppState>()(
         const nextDownloaders =
           nextList.length === 0
             ? (() => {
-                const { [fileId]: __, ...r } = fileDownloaders;
-                return r;
-              })()
+              const { [fileId]: __, ...r } = fileDownloaders;
+              return r;
+            })()
             : { ...fileDownloaders, [fileId]: nextList };
         const nextProgress =
           nextList.length === 0
             ? (() => {
-                const { [fileId]: __, ...r } = fileDownloaderProgress;
-                return r;
-              })()
+              const { [fileId]: __, ...r } = fileDownloaderProgress;
+              return r;
+            })()
             : { ...fileDownloaderProgress, [fileId]: nextProgByFile ?? {} };
         set({ fileDownloaders: nextDownloaders, fileDownloaderProgress: nextProgress });
       },
@@ -702,12 +706,12 @@ export const useStore = create<AppState>()(
       addMessage: (message) => {
         const { currentRoom } = get();
         if (!currentRoom) return;
-        
+
         const newMessage: ChatMessage = {
           ...message,
           id: generateId(),
         };
-        
+
         set({
           currentRoom: {
             ...currentRoom,
@@ -721,10 +725,10 @@ export const useStore = create<AppState>()(
       saveToHistory: () => {
         const { currentRoom, roomHistory } = get();
         if (!currentRoom) return;
-        
+
         // Remove if already exists
         const filtered = roomHistory.filter(r => r.id !== currentRoom.id);
-        
+
         // Add to beginning (most recent first)
         const updated = [
           {
@@ -734,7 +738,7 @@ export const useStore = create<AppState>()(
           },
           ...filtered,
         ].slice(0, 10); // Keep only last 10 rooms
-        
+
         set({ roomHistory: updated });
       },
 

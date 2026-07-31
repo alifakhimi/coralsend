@@ -1,6 +1,6 @@
 # Design System
 
-Concise standards for UI consistency in the CoralSend web app. Implementation lives in `apps/web/src/app/globals.css` and shared components.
+Concise standards for UI consistency in the CoralSend web app. Implementation lives in `apps/app/src/app/globals.css` and shared components.
 
 ---
 

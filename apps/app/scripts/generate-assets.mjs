@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Generate all web assets from apps/web/public/coralsend-logo.png
- * Run from repo root: node apps/web/scripts/generate-assets.mjs
+ * Generate all app assets from apps/app/public/coralsend-logo.png
+ * Run from repo root: node apps/app/scripts/generate-assets.mjs
  */
 
 import sharp from 'sharp';

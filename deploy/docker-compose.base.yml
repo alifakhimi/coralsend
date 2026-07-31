@@ -1,4 +1,4 @@
-# Shared services: server, web, coturn
+# Shared services: server, app, coturn
 # Used by both docker-compose.yml (with nginx) and docker-compose.proxy.yml (behind reverse proxy)
 services:
   server:
@@ -23,11 +23,11 @@ services:
       retries: ${SERVER_HEALTHCHECK_RETRIES:-5}
       start_period: ${SERVER_HEALTHCHECK_START_PERIOD:-10s}
 
-  web:
-    image: ${WEB_IMAGE:-ghcr.io/alifakhimi/coralsend-web:latest}
+  app:
+    image: ${WEB_IMAGE:-ghcr.io/alifakhimi/coralsend-app:latest}
     build:
       context: ../
-      dockerfile: deploy/Dockerfile.web
+      dockerfile: deploy/Dockerfile.app
       args:
         - NEXT_PUBLIC_APP_VERSION=${NEXT_PUBLIC_APP_VERSION:-}
         - NEXT_PUBLIC_GITHUB_URL=${NEXT_PUBLIC_GITHUB_URL:-}
@@ -70,43 +70,6 @@ services:
       server:
         condition: service_healthy
     restart: unless-stopped
-
-  coturn:
-    image: ${COTURN_IMAGE:-coturn/coturn:4.8.0}
-    restart: unless-stopped
-    # volumes:
-    #   - ./turnserver.conf:/etc/turnserver.conf:ro
-    #   - turn_data:/var/lib/turn
-    command:
-      - -n
-      - --log-file=stdout
-      - --listening-ip=${COTURN_LISTENING_IP:-0.0.0.0}
-      - --listening-port=${COTURN_LISTENING_PORT:-3478}
-      - --min-port=${COTURN_MIN_PORT:-49160}
-      - --max-port=${COTURN_MAX_PORT:-49200}
-      - --realm=${TURN_REALM:-}
-      - --lt-cred-mech
-      - --user=${TURN_USER:-coralsend}:${TURN_PASS:-coralsend}
-      - --external-ip=${TURN_EXTERNAL_IP:-120.0.0.1}
-      - --fingerprint
-      - --no-dtls
-      - --no-tls
-      - --no-cli
-      # - --no-rfc5780
-      # - --web-admin
-      # - --web-admin-ip=94.182.93.20
-      # - --web-admin-port=8080
-      # - --no-stun-backward-compatibility
-      # - --response-origin-only-with-rfc5780
-      # - --Verbose
-    ports:
-      - "${COTURN_TLS_LISTENING_PORT:-5349}:${COTURN_TLS_LISTENING_PORT:-5349}/tcp"
-      - "${COTURN_LISTENING_PORT:-3478}:${COTURN_LISTENING_PORT:-3478}/tcp"
-      - "${COTURN_LISTENING_PORT:-3478}:${COTURN_LISTENING_PORT:-3478}/udp"
-      - "${COTURN_MIN_PORT:-49160}-${COTURN_MAX_PORT:-49200}:${COTURN_MIN_PORT:-49160}-${COTURN_MAX_PORT:-49200}/tcp"
-      - "${COTURN_MIN_PORT:-49160}-${COTURN_MAX_PORT:-49200}:${COTURN_MIN_PORT:-49160}-${COTURN_MAX_PORT:-49200}/udp"
-    # network_mode: host
-    # user: root
 
 volumes:
   turn_data:

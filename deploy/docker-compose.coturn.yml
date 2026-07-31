@@ -1,0 +1,73 @@
+services:
+  postgres:
+    image: ${POSTGRESS_IMAGE:-postgres:15}
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-coturn}
+      POSTGRES_USER: ${POSTGRES_USER:-coturn}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-coturnpass}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  coturn:
+    image: ${COTURN_IMAGE:-instrumentisto/coturn}
+    environment:
+      # detect-external-ip script needs to be available in the image
+      # Or you can set EXTERNAL_IP manually in .env
+      EXTERNAL_IP: ${EXTERNAL_IP}
+    command:
+      - "-n"
+      - "--log-file=stdout"
+      - "--external-ip=$(EXTERNAL_IP)"
+      - "--realm=${COTURN_REALM}"
+      - "--user=${COTURN_USER:-coralsend}:${COTURN_PASS:-coralsend}"
+      - "--listening-port=3478"
+      - "--tls-listening-port=5349"
+      - "--min-port=49152"
+      - "--max-port=49200"
+      - "--server-name=${COTURN_SERVER_NAME}"
+      - "--no-cli"
+      - "--lt-cred-mech"
+      # - "--use-auth-secret"
+      # - "--static-auth-secret=${STATIC_AUTH_SECRET}"
+      - "--no-dtls"
+      - "--no-tls"
+      # - "--verbose"
+      # - "--web-admin"
+      # - "--web-admin-ip=94.182.93.20"
+      # - "--web-admin-port=8080"
+      # - "--no-rfc5780"
+      # - "--response-origin-only-with-rfc5780"
+      # - "--no-multicast-peers"
+      # - "--no-stun-backward-compatibility" # Consider removing if not needed or check coturn version
+      # - "--userdb=postgresql"
+      # - "--psql-userdb-connstr=host=postgres dbname=${POSTGRES_DB} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD}"
+    volumes:
+      # - turn_data:/var/lib/turn
+    network_mode: host
+    # ports:
+    #   - "${COTURN_TLS_LISTENING_PORT:-5349}:${COTURN_TLS_LISTENING_PORT:-5349}/tcp"
+    #   - "${COTURN_LISTENING_PORT:-3478}:${COTURN_LISTENING_PORT:-3478}/tcp"
+    #   - "${COTURN_LISTENING_PORT:-3478}:${COTURN_LISTENING_PORT:-3478}/udp"
+    #   - "${COTURN_MIN_PORT:-49160}-${COTURN_MAX_PORT:-49200}:${COTURN_MIN_PORT:-49160}-${COTURN_MAX_PORT:-49200}/tcp"
+    #   - "${COTURN_MIN_PORT:-49160}-${COTURN_MAX_PORT:-49200}:${COTURN_MIN_PORT:-49160}-${COTURN_MAX_PORT:-49200}/udp"
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  # coturn-admin:
+  #   image: robcsi/coturn-dashboard
+  #   container_name: coturn_admin
+  #   ports:
+  #     - "${ADMIN_PORT:-8080}:80"    # UI panel → http://server-ip:8080
+  #   environment:
+  #     DB_HOST: postgres
+  #     DB_USER: ${POSTGRES_USER:-coturn}
+  #     DB_PASS: ${POSTGRES_PASSWORD:-coturnpass}
+  #     DB_NAME: ${POSTGRES_DB:-coturn}
+  #   depends_on:
+  #     - postgres
+  #   restart: unless-stopped
+
+volumes:
+  db_data:

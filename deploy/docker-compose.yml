@@ -11,5 +11,5 @@ services:
     ports:
       - "${NGINX_HTTP_PORT:-80}:80"
     depends_on:
-      - web
+      - app
       - server

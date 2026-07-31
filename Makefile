@@ -1,47 +1,73 @@
-.PHONY: dev server web install docker-up docker-down docker-restart docker-logs docker-build
+.PHONY: dev server app install docker-up docker-coturn-up docker-down docker-restart docker-logs docker-build
 
 COMPOSE := docker compose
 COMPOSE_FILE := deploy/docker-compose.yml
-ENV_FILE := $(shell [ -f .env.local ] && echo --env-file .env.local)
+COMPOSE_COTURN_FILE := deploy/docker-compose.coturn.yml
+ROOT_DIR := $(shell git rev-parse --show-toplevel 2>/dev/null || pwd)
+PROJECT_NAME ?= $(notdir $(ROOT_DIR))
+COMPOSE_PROJECT := --project-name $(PROJECT_NAME)
+ENV_FILE := $(if $(wildcard .env.local),--env-file .env.local,)
 
 dev:
 	@echo "Starting development environment..."
-	@make -j 2 server web
+	@make -j 2 server app
 
 server:
 	@echo "Starting Signaling Server..."
 	@cd apps/server && [ -f .env.local ] && set -a && . ./.env.local && set +a; go run cmd/server/main.go -addr=:$${SERVER_PORT:-8080}
 
-web:
+app:
 	@echo "Starting Web PWA..."
-	@cd apps/web && npm run dev
+	@cd apps/app && npm run dev
 
 install:
 	@echo "Installing dependencies..."
 	@cd apps/server && go mod tidy
-	@cd apps/web && npm install
+	@cd apps/app && npm install
 
 generate-assets:
-	@echo "Generate web assets..."
-	@cd apps/web && npm run generate-assets
+	@echo "Generate app assets..."
+	@cd apps/app && npm run generate-assets
+
+coturn-up:
+	@echo "Starting coTURN stack..."
+	@$(COMPOSE) $(COMPOSE_PROJECT) $(ENV_FILE) -f $(COMPOSE_COTURN_FILE) up -d
+
+coturn-down:
+	@echo "Stopping coTURN stack..."
+	@$(COMPOSE) $(COMPOSE_PROJECT) $(ENV_FILE) -f $(COMPOSE_COTURN_FILE) down
+
+docker-up-coturn:
+	@echo "Starting Docker Compose stack with coTURN..."
+	@$(COMPOSE) $(COMPOSE_PROJECT) $(ENV_FILE) -f $(COMPOSE_FILE) -f $(COMPOSE_COTURN_FILE) up -d
+
+docker-down-coturn:
+	@echo "Stopping Docker Compose stack with coTURN..."
+	@$(COMPOSE) $(COMPOSE_PROJECT) $(ENV_FILE) -f $(COMPOSE_FILE) -f $(COMPOSE_COTURN_FILE) down
+
+docker-restart-coturn:
+	@echo "Restarting Docker Compose stack with coTURN..."
+	@$(COMPOSE) $(COMPOSE_PROJECT) $(ENV_FILE) -f $(COMPOSE_FILE) -f $(COMPOSE_COTURN_FILE) down
+	@$(COMPOSE) $(COMPOSE_PROJECT) $(ENV_FILE) -f $(COMPOSE_FILE) -f $(COMPOSE_COTURN_FILE) up -d
 
 docker-up:
 	@echo "Starting Docker Compose stack..."
-	@$(COMPOSE) $(ENV_FILE) -f $(COMPOSE_FILE) up -d
+	@echo $(COMPOSE_PROJECT)
+	@$(COMPOSE) $(COMPOSE_PROJECT) $(ENV_FILE) -f $(COMPOSE_FILE) up -d
 
 docker-build:
 	@echo "Building Docker images..."
-	@DOCKER_BUILDKIT=0 $(COMPOSE) $(ENV_FILE) -f $(COMPOSE_FILE) build
+	@DOCKER_BUILDKIT=0 $(COMPOSE) $(COMPOSE_PROJECT) $(ENV_FILE) -f $(COMPOSE_FILE) build
 
 docker-down:
 	@echo "Stopping Docker Compose stack..."
-	@$(COMPOSE) $(ENV_FILE) -f $(COMPOSE_FILE) down
+	@$(COMPOSE) $(COMPOSE_PROJECT) $(ENV_FILE) -f $(COMPOSE_FILE) down
 
 docker-restart:
 	@echo "Restarting Docker Compose stack..."
-	@$(COMPOSE) $(ENV_FILE) -f $(COMPOSE_FILE) down
-	@$(COMPOSE) $(ENV_FILE) -f $(COMPOSE_FILE) up -d
+	@$(COMPOSE) $(COMPOSE_PROJECT) $(ENV_FILE) -f $(COMPOSE_FILE) down
+	@$(COMPOSE) $(COMPOSE_PROJECT) $(ENV_FILE) -f $(COMPOSE_FILE) up -d
 
 docker-logs:
-	@$(COMPOSE) $(ENV_FILE) -f $(COMPOSE_FILE) logs -f --tail=200
+	@$(COMPOSE) $(COMPOSE_PROJECT) $(ENV_FILE) -f $(COMPOSE_FILE) logs -f --tail=200
 

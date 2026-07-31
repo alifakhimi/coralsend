@@ -34,6 +34,13 @@ export function useRoomActions() {
   const createRoomAndNavigate = useCallback(() => {
     const roomId = generateRoomCode();
     analytics.track('room_created', { roomId });
+    // Persist creator status in sessionStorage before navigation.
+    // sessionStorage survives hard refreshes (within the same tab), React Strict Mode
+    // double-invocation, store resets, and reconnect calls — making it the most
+    // reliable signal for "this device created this room".
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem(`coralsend:creator:${roomId}`, '1');
+    }
     navigateToRoom(roomId, true);
   }, [navigateToRoom]);
 

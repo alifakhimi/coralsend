@@ -9,7 +9,7 @@ Define the minimum asset register required to operate CoralSend safely in produc
 | Asset | Owner | Location | Sensitivity | Backup/Recovery Notes |
 | --- | --- | --- | --- | --- |
 | Source code | Engineering | GitHub repository | Internal | GitHub is source of truth; branch protection recommended. |
-| Web build artifacts | Engineering | GHCR `coralsend-web` image | Internal | Rebuild from tagged commits and workflow pipeline. |
+| Web build artifacts | Engineering | GHCR `coralsend-app` image | Internal | Rebuild from tagged commits and workflow pipeline. |
 | Signaling server artifacts | Engineering | GHCR `coralsend-server` image | Internal | Rebuild from tagged commits and workflow pipeline. |
 | Web production config | Engineering | `.env` / deploy env vars | Confidential | Keep encrypted at rest in secret manager; rotate on leak. |
 | Signaling/TURN credentials | Engineering | `.env`, deployment runtime | Secret | Rotate immediately if exposed; never commit to git. |

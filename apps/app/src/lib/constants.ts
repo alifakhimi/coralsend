@@ -60,8 +60,15 @@ export const getSignalingServerUrl = (): string => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const hostname = window.location.hostname;
 
-    // If localhost or 127.0.0.1, use port 8080
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    // If localhost, 127.0.0.1, or a local network IP, use port 8080 for signaling
+    const isLocalNetwork = 
+      hostname === 'localhost' || 
+      hostname === '127.0.0.1' || 
+      /^192\.168\./.test(hostname) || 
+      /^10\./.test(hostname) || 
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname);
+
+    if (isLocalNetwork) {
       return `${protocol}//${hostname}:8080/ws`;
     }
 
@@ -77,17 +84,19 @@ const envTurnUrl = process.env.NEXT_PUBLIC_TURN_URL?.trim();
 const envTurnUser = process.env.NEXT_PUBLIC_TURN_USER?.trim();
 const envTurnPass = process.env.NEXT_PUBLIC_TURN_PASS?.trim();
 
-export const ICE_SERVERS: RTCIceServer[] = [
-  { urls: envStunUrl || 'stun:stun.l.google.com:19302' },
-];
+const envICEUrls = [envStunUrl || 'stun:stun.l.google.com:19302']
 
 if (envTurnUrl && envTurnUser && envTurnPass) {
-  ICE_SERVERS.push({
-    urls: envTurnUrl,
+  envICEUrls.push(envTurnUrl);
+}
+
+export const ICE_SERVERS: RTCIceServer[] = [
+  {
+    urls: envICEUrls,
     username: envTurnUser,
     credential: envTurnPass,
-  });
-}
+  },
+];
 
 /** App version (injected at build from package.json or env) */
 export const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || '0.0.0';

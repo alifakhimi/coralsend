@@ -49,7 +49,7 @@ CoralSend uses a split licensing model:
 
 ### Components
 
-- `apps/web`: Next.js (App Router) PWA frontend
+- `apps/app`: Next.js (App Router) PWA frontend
 - `apps/server`: Go WebSocket signaling server
 
 ### Communication diagrams
@@ -188,7 +188,7 @@ cp .env.example .env
 
 - `NEXT_PUBLIC_BASE_PATH`: Base path for subdirectory deployment (e.g., `/coralsend`). Leave empty for root deployment.
 - `NEXT_PUBLIC_SITE_URL`: Public site origin used for canonical metadata, sitemap, robots, and `llms.txt` URLs.
-- `NEXT_PUBLIC_APP_VERSION`: App version shown in UI (falls back to `apps/web/package.json` if unset).
+- `NEXT_PUBLIC_APP_VERSION`: App version shown in UI (falls back to `apps/app/package.json` if unset).
 - `NEXT_PUBLIC_SIGNALING_URL`: WebSocket signaling server URL (e.g., `wss://yourdomain.com/ws`). If not set, auto-detected from current URL.
 - `NEXT_PUBLIC_STUN_URL`: STUN server URL for ICE gathering.
 - `NEXT_PUBLIC_TURN_URL`, `NEXT_PUBLIC_TURN_USER`, `NEXT_PUBLIC_TURN_PASS`: TURN relay configuration.
@@ -217,7 +217,7 @@ NEXT_PUBLIC_SIGNALING_URL=wss://612.ir/ws
 
 | Stage | Command / Method | Compose / Env |
 |-------|------------------|---------------|
-| Development | `make dev` | `apps/server/.env`, `apps/web/.env.local` |
+| Development | `make dev` | `apps/server/.env`, `apps/app/.env.local` |
 | Local Human Test | `make docker-up` | `deploy/docker-compose.yml`, repo root `.env` |
 | Staging | Dokploy (all-in-one) | `deploy/docker-compose.dokploy.yml`, Dokploy env |
 | Production (VPS) | Docker Compose | `deploy/docker-compose.prod.yml`, repo root `.env` |
@@ -243,13 +243,13 @@ go run cmd/server/main.go
 Frontend:
 
 ```bash
-cd apps/web
+cd apps/app
 npm run dev
 ```
 
 ### Local Human Test (Docker)
 
-To run the full stack in Docker (server + web) for local testing:
+To run the full stack in Docker (server + app) for local testing:
 
 ```bash
 cp .env.example .env
@@ -263,7 +263,7 @@ Web UI: `http://localhost:3000`, signaling: `ws://localhost:8080/ws`. Use `make 
 To test from a mobile device, your Next.js dev server must listen on all interfaces:
 
 ```bash
-cd apps/web
+cd apps/app
 npm run dev -- -H 0.0.0.0
 ```
 
@@ -277,7 +277,7 @@ The app will automatically compute the WebSocket URL for signaling using your cu
 ## Production installation on a VPS (Docker Compose)
 
 This section describes a complete self-hosted deployment with:
-- `web` (Next.js app)
+- `app` (Next.js app)
 - `server` (Go signaling)
 - `nginx` (reverse proxy)
 - `coturn` (self-hosted STUN/TURN)
@@ -287,7 +287,7 @@ This section describes a complete self-hosted deployment with:
 - Ubuntu/Debian VPS with a public IP
 - Docker + Docker Compose plugin installed
 - DNS records pointing to the VPS (recommended):
-  - `app.example.com` (web + ws through nginx)
+  - `app.example.com` (app + ws through nginx)
   - `turn.example.com` (TURN endpoint)
 - Open firewall ports:
   - `80/tcp` (HTTP)
@@ -357,16 +357,16 @@ Expected behavior:
 
 - If app is behind `/coralsend`, set:
   - `NEXT_PUBLIC_BASE_PATH=/coralsend`
-- Ensure reverse proxy routes that path to `web:3000`.
+- Ensure reverse proxy routes that path to `app:3000`.
 - `NEXT_PUBLIC_SIGNALING_URL` should still point to `/ws` on the same external domain (or a dedicated WS domain).
 
 ### 7) Production (Dokploy, 3 separate services)
 
-When deploying on Dokploy with three separate services (coturn, server, web):
+When deploying on Dokploy with three separate services (coturn, server, app):
 
 - **Coturn**: Create the service manually in Dokploy UI. Use [deploy/.env.coturn.example](deploy/.env.coturn.example) for environment variables.
 - **Server**: Build from [deploy/Dockerfile.server](deploy/Dockerfile.server). Use [deploy/.env.server.example](deploy/.env.server.example) for environment variables (e.g. `ALLOWED_ORIGINS`, `HOST_SECRET`).
-- **Web**: Build from [deploy/Dockerfile.web](deploy/Dockerfile.web). Pass `NEXT_PUBLIC_*` as build args in Dokploy; see [deploy/.env.web.example](deploy/.env.web.example) for the full list.
+- **Web**: Build from [deploy/Dockerfile.app](deploy/Dockerfile.app). Pass `NEXT_PUBLIC_*` as build args in Dokploy; see [deploy/.env.app.example](deploy/.env.app.example) for the full list.
 
 ## Runtime behavior (step-by-step)
 
@@ -383,10 +383,10 @@ When deploying on Dokploy with three separate services (coturn, server, web):
 ## CI/CD: Build and publish Docker images to GHCR
 
 This repository includes a GitHub Actions workflow at `.github/workflows/docker.yml` that:
-- Builds `deploy/Dockerfile.server` and `deploy/Dockerfile.web`
+- Builds `deploy/Dockerfile.server` and `deploy/Dockerfile.app`
 - Publishes to GHCR:
   - `ghcr.io/<owner>/coralsend-server`
-  - `ghcr.io/<owner>/coralsend-web`
+  - `ghcr.io/<owner>/coralsend-app`
 - Tags images with branch, semver tags, and commit SHA
 
 ### Required repository settings

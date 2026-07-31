@@ -23,8 +23,8 @@ jobs:
         include:
           - image_name: coralsend-server
             dockerfile: deploy/Dockerfile.server
-          - image_name: coralsend-web
-            dockerfile: deploy/Dockerfile.web
+          - image_name: coralsend-app
+            dockerfile: deploy/Dockerfile.app
     steps:
       - name: Checkout
         uses: actions/checkout@v4

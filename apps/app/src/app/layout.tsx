@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next';
 import { ASSETS } from '@/lib/constants';
 import { getSiteUrl } from '@/lib/site';
 import { PWAProvider } from '@/components/PWAProvider';
+import { AnalyticsConsent } from '@/components/AnalyticsConsent';
 import './globals.css';
 
 // const dmSans = DM_Sans({
@@ -97,6 +98,7 @@ export default function RootLayout({
       </head>
       <body className="font-sans antialiased">
         <PWAProvider>{children}</PWAProvider>
+        <AnalyticsConsent />
       </body>
     </html>
   );

@@ -11,6 +11,8 @@ export class PostHogAdapter implements AnalyticsAdapter {
     posthog.init(key, { api_host: host });
   }
 
+  setConsent(): void {}
+
   identify(userId: string, properties?: Record<string, unknown>): void {
     if (typeof window === 'undefined') return;
     posthog.identify(userId);

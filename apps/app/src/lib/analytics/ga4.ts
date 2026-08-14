@@ -1,7 +1,8 @@
 'use client';
 import type { AnalyticsAdapter } from './types';
-export const CONSENT_KEY = 'coralsend_analytics_consent';
-const ALLOWED_EVENTS = new Set(['file_shared', 'file_downloaded']);
+import { ANALYTICS_CONSENT_KEY, hasAnalyticsConsent, storeAnalyticsConsent } from './consent';
+export const CONSENT_KEY = ANALYTICS_CONSENT_KEY;
+const ALLOWED_EVENTS = new Set(['transfer_attempt', 'transfer_completed', 'transfer_failed']);
 declare global { interface Window { dataLayer?: unknown[]; gtag?: (...args: unknown[]) => void; } }
 function safePagePath(pathname: string): string {
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH?.replace(/\/$/, '') ?? '';
@@ -12,10 +13,10 @@ function safePagePath(pathname: string): string {
 }
 export class Ga4Adapter implements AnalyticsAdapter {
   private initialized = false;
-  init(): void { if (typeof window !== 'undefined' && localStorage.getItem(CONSENT_KEY) === 'granted') this.enable(); }
+  init(): void { if (hasAnalyticsConsent()) this.enable(); }
   setConsent(granted: boolean): void {
     if (typeof window === 'undefined') return;
-    localStorage.setItem(CONSENT_KEY, granted ? 'granted' : 'denied');
+    storeAnalyticsConsent(granted);
     if (granted) this.enable();
   }
   private enable(): void {

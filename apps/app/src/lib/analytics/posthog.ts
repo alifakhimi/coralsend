@@ -5,9 +5,9 @@ import type { AnalyticsAdapter } from './types';
 import { hasAnalyticsConsent, storeAnalyticsConsent } from './consent';
 
 const ALLOWED_PROPERTIES: Record<string, ReadonlySet<string>> = {
-  transfer_attempt: new Set(['direction', 'size_bucket']),
-  transfer_completed: new Set(['direction', 'size_bucket', 'duration_bucket']),
-  transfer_failed: new Set(['direction', 'size_bucket', 'duration_bucket', 'failure_category']),
+  transfer_attempted: new Set(['schema_version', 'direction', 'size_bucket']),
+  transfer_completed: new Set(['schema_version', 'direction', 'size_bucket', 'duration_bucket']),
+  transfer_failed: new Set(['schema_version', 'direction', 'size_bucket', 'duration_bucket', 'failure_category']),
 };
 
 export class PostHogAdapter implements AnalyticsAdapter {

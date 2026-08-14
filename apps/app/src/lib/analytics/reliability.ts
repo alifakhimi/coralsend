@@ -1,5 +1,7 @@
 import { analytics } from './index';
 
+const SCHEMA_VERSION = 1;
+
 export type TransferSizeBucket = 'under_1_mib' | '1_to_10_mib' | '10_to_100_mib' | '100_mib_or_more';
 export type TransferDurationBucket = 'under_1s' | '1_to_5s' | '5_to_30s' | '30s_to_2m' | '2m_or_more';
 export type TransferFailureCategory =
@@ -25,7 +27,8 @@ export function transferDurationBucket(milliseconds: number): TransferDurationBu
 }
 
 export function trackTransferAttempt(bytes: number): void {
-  analytics.track('transfer_attempt', {
+  analytics.track('transfer_attempted', {
+    schema_version: SCHEMA_VERSION,
     direction: 'receive',
     size_bucket: transferSizeBucket(bytes),
   });
@@ -33,6 +36,7 @@ export function trackTransferAttempt(bytes: number): void {
 
 export function trackTransferCompleted(bytes: number, elapsedMilliseconds: number): void {
   analytics.track('transfer_completed', {
+    schema_version: SCHEMA_VERSION,
     direction: 'receive',
     size_bucket: transferSizeBucket(bytes),
     duration_bucket: transferDurationBucket(elapsedMilliseconds),
@@ -45,6 +49,7 @@ export function trackTransferFailed(
   failureCategory: TransferFailureCategory,
 ): void {
   analytics.track('transfer_failed', {
+    schema_version: SCHEMA_VERSION,
     direction: 'receive',
     size_bucket: transferSizeBucket(bytes),
     duration_bucket: transferDurationBucket(elapsedMilliseconds),

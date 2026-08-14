@@ -8,9 +8,9 @@ session recording, person profiles, and persistent PostHog storage are disabled.
 
 | Indicator | Aggregate definition | Event |
 | --- | --- | --- |
-| Attempts | Count of recipient-initiated file requests, including requests rejected because signaling is unavailable | `transfer_attempt` |
+| Attempts | Count of recipient-initiated file requests, including requests rejected because signaling is unavailable | `transfer_attempted` |
 | Successful completion | Count of recipients that receive `file-end` after a known transfer start | `transfer_completed` |
-| Failure rate by category | `transfer_failed / transfer_attempt`, grouped by enumerated `failure_category` | `transfer_failed` |
+| Failure rate by category | `transfer_failed / transfer_attempted`, grouped by enumerated `failure_category` | `transfer_failed` |
 | Duration distribution | Completion/failure counts grouped by coarse `duration_bucket` | terminal event |
 
 Each attempt is measured from the receiving client to avoid double-counting sender and
@@ -21,9 +21,9 @@ person, customer, or market demand.
 
 | Event | Properties | Emission point |
 | --- | --- | --- |
-| `transfer_attempt` | `direction='receive'`, `size_bucket` | Recipient requests a file |
-| `transfer_completed` | `direction='receive'`, `size_bucket`, `duration_bucket` | Recipient processes `file-end` |
-| `transfer_failed` | `direction='receive'`, `size_bucket`, `duration_bucket`, `failure_category` | Request cannot start or recipient cancels |
+| `transfer_attempted` | `schema_version=1`, `direction=receive`, `size_bucket` | Recipient requests a file |
+| `transfer_completed` | `schema_version=1`, `direction=receive`, `size_bucket`, `duration_bucket` | Recipient processes `file-end` |
+| `transfer_failed` | `schema_version=1`, `direction=receive`, `size_bucket`, `duration_bucket`, `failure_category` | Request cannot start or recipient cancels |
 
 Size buckets: `under_1_mib`, `1_to_10_mib`, `10_to_100_mib`, and
 `100_mib_or_more`. Duration buckets: `under_1s`, `1_to_5s`, `5_to_30s`,
@@ -33,6 +33,7 @@ Failure categories are closed enums: `cancelled_by_recipient`,
 `connection_unavailable`, `data_channel_error`, `storage_error`, and
 `protocol_error`. Only categories wired to a reproducible lifecycle path are emitted;
 unused categories reserve stable classifications without accepting raw errors.
+`schema_version` is fixed at integer `1`; increment it before changing event semantics or any enum/bucket definition.
 
 ## Privacy boundary
 

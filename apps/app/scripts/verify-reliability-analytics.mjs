@@ -10,9 +10,9 @@ const [posthog, consent, reliability, transfer] = await Promise.all([
 ]);
 
 const expectedSchemas = {
-  transfer_attempt: ['direction', 'size_bucket'],
-  transfer_completed: ['direction', 'size_bucket', 'duration_bucket'],
-  transfer_failed: ['direction', 'size_bucket', 'duration_bucket', 'failure_category'],
+  transfer_attempted: ['schema_version', 'direction', 'size_bucket'],
+  transfer_completed: ['schema_version', 'direction', 'size_bucket', 'duration_bucket'],
+  transfer_failed: ['schema_version', 'direction', 'size_bucket', 'duration_bucket', 'failure_category'],
 };
 
 for (const [event, properties] of Object.entries(expectedSchemas)) {
@@ -30,6 +30,7 @@ assert.match(posthog, /!this\.consentGranted/);
 assert.match(posthog, /identify\([^)]*\): void \{\}/);
 assert.match(consent, /=== 'granted'/);
 assert.match(transfer, /trackTransferAttempt\(file\.size\)/);
+assert.match(reliability, /const SCHEMA_VERSION = 1/);
 assert.match(transfer, /trackTransferCompleted\(incoming\.meta\.size, Date\.now\(\) - incoming\.startTime\)/);
 assert.match(transfer, /'cancelled_by_recipient'/);
 assert.match(transfer, /'connection_unavailable'/);

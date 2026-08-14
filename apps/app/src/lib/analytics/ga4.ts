@@ -2,7 +2,7 @@
 import type { AnalyticsAdapter } from './types';
 import { ANALYTICS_CONSENT_KEY, hasAnalyticsConsent, storeAnalyticsConsent } from './consent';
 export const CONSENT_KEY = ANALYTICS_CONSENT_KEY;
-const ALLOWED_EVENTS = new Set(['transfer_attempt', 'transfer_completed', 'transfer_failed']);
+const ALLOWED_EVENTS = new Set(['transfer_attempted', 'transfer_completed', 'transfer_failed']);
 declare global { interface Window { dataLayer?: unknown[]; gtag?: (...args: unknown[]) => void; } }
 function safePagePath(pathname: string): string {
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH?.replace(/\/$/, '') ?? '';

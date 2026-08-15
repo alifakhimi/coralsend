@@ -1,4 +1,4 @@
-.PHONY: dev server app install docker-up docker-coturn-up docker-down docker-restart docker-logs docker-build
+.PHONY: dev server app install test check docker-up docker-coturn-up docker-down docker-restart docker-logs docker-build
 
 COMPOSE := docker compose
 COMPOSE_FILE := deploy/docker-compose.yml
@@ -24,6 +24,18 @@ install:
 	@echo "Installing dependencies..."
 	@cd apps/server && go mod tidy
 	@cd apps/app && npm install
+
+test:
+	@echo "Running automated tests..."
+	@cd apps/server && go test ./...
+
+check: test
+	@echo "Running Go static analysis..."
+	@cd apps/server && go vet ./...
+	@echo "Linting web app..."
+	@cd apps/app && npm run lint
+	@echo "Building web app..."
+	@cd apps/app && npm run build
 
 generate-assets:
 	@echo "Generate app assets..."

@@ -231,6 +231,14 @@ Run both services:
 make dev
 ```
 
+Run the reproducible engineering checks (synthetic data only):
+
+```bash
+make check
+```
+
+See [docs/engineering-baseline.md](docs/engineering-baseline.md) for automated coverage, manual checks, and current reliability/security findings.
+
 Or run manually:
 
 Backend:

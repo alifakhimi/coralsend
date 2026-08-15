@@ -8,9 +8,9 @@ import {
   type ConnectionPath,
   type AutoExpireValue,
 } from '@/store/store';
-import { analytics } from '@/lib/analytics';
 import { getSignalingServerUrl, ICE_SERVERS } from '@/lib/constants';
 import { getDeviceId, getShortName } from '@/lib/deviceId';
+import { trackTransferAttempt, trackTransferCompleted, trackTransferFailed } from '@/lib/analytics/reliability';
 import { logger } from '@/lib/logger';
 
 // ============ Types ============
@@ -363,10 +363,7 @@ export const useWebRTC = () => {
             if (dc?.readyState === 'open') {
               dc.send(JSON.stringify({ type: 'file-progress', fileId, progress: 100 }));
             }
-            analytics.track('file_downloaded', {
-              fileType: incoming.meta.type,
-              fileSize: incoming.meta.size,
-            });
+            trackTransferCompleted(incoming.meta.size, Date.now() - incoming.startTime);
             logger.info('Transfer', `File transfer complete: ${incoming.meta.name}`);
             store.updateFileStatus(fileId, 'completed');
             
@@ -1242,7 +1239,6 @@ export const useWebRTC = () => {
       payload: meta,
     }));
 
-    analytics.track('file_shared', { fileType: file.type, fileSize: file.size });
     console.log('File shared:', file.name, thumbnailUrl ? '(with thumbnail)' : '');
   }, []);
 
@@ -1254,6 +1250,13 @@ export const useWebRTC = () => {
 
     const uploaderId = file.uploaderId;
     const dc = dataChannels.current.get(uploaderId);
+    const incoming = incomingChunks.current.get(fileId);
+    trackTransferFailed(
+      file.size,
+      incoming ? Date.now() - incoming.startTime : 0,
+      'cancelled_by_recipient',
+    );
+
     if (dc?.readyState === 'open') {
       dc.send(JSON.stringify({ type: 'file-cancel', fileId }));
     }
@@ -1289,6 +1292,12 @@ export const useWebRTC = () => {
     const room = store.currentRoom;
     if (!room || !store.deviceId) return;
 
+    if (ws.current?.readyState !== WebSocket.OPEN) {
+      trackTransferAttempt(file.size);
+      trackTransferFailed(file.size, 0, 'connection_unavailable');
+      return;
+    }
+
     if (mode === 'download' && 'showSaveFilePicker' in window) {
       try {
         const handle = await (window as any).showSaveFilePicker({ suggestedName: file.name });
@@ -1301,6 +1310,7 @@ export const useWebRTC = () => {
       }
     }
 
+    trackTransferAttempt(file.size);
     console.log('Requesting file:', file.name, 'from', file.uploaderId);
     requestModes.current.set(file.id, mode);
 

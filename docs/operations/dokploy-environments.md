@@ -1,158 +1,220 @@
-# Dokploy environments baseline
+# CoralSend Dokploy environments
 
-Evidence snapshot: 2026-08-13T17:04:16Z (UTC)
+> Verified read-only against Dokploy and public routes on 2026-08-14. This is
+> an inventory and operator runbook, not authorization to create, edit, deploy,
+> or read secret values.
 
-This document records observed state only. It does not authorize a deployment,
-configuration change, secret read, or production access. Secret values were not
-read into this document; only variable names are listed.
+## Scope and evidence
 
-## Project and control-plane scope
+This document records the existing `CoralSend` project on the Germany-hosted
+Twomodo Dokploy instance. Evidence came from the authenticated read API, the
+live service definitions and deployment history, the exact deployed Git
+commits, and public HTTP/WebSocket probes. Secret-bearing configuration was
+reduced to variable names before it was recorded.
+
+The earlier four-service discrepancy is reconciled: the project has **four
+Dokploy services in total**, while production has **three**. The fourth service
+is develop's `app` Compose service; it is not a hidden production service.
+
+## Project and access
 
 | Field | Observed value |
 | --- | --- |
-| Dokploy project | `CoralSend` |
+| Project | `CoralSend` |
 | Project ID | `mrAwYiDXag4ti_6bZA8or` |
-| Project created | 2026-01-07 |
-| Environments | `production`, `develop` |
-| Source repository | `twomodo/coralsend` |
-| Repository default branch | `main` |
-| Project-scoped variable names | `CLOUDFLARE_TOKEN`, `NEXT_PUBLIC_BASE_PATH`, `NEXT_PUBLIC_SIGNALING_URL` |
+| Organization / control-plane owner | `Twomodo` / Dokploy organization-owner role; the owner's personal name is not visible to the inventory identity |
+| Environments | `production` and `develop` |
+| Repository | `https://github.com/twomodo/coralsend` |
+| Inventory identity | Unnamed Dokploy `member`, explicitly scoped to this project, both environments, and all four service IDs |
+| Minimum operational read access | Dokploy `member` with explicit project, environment, and service scope plus `environment.read`, `service.read`, `domain.read`, `deployment.read`, `logs.read`, `monitoring.read`, `backup.read`, `volume.read`, and `volumeBackup.read` |
+| Minimum deployment access | A scoped operator permitted to deploy the affected service; organization-owner access is not required for routine service deployment |
 
-The current operations token can read the project, environments, deployment
-summary, domains, logs, volumes, and backups in principle. It does not have
-resource-level access to the application referenced by the live deployment
-queue, and the project/environment list APIs currently return no services. The
-access owner and named Dokploy organization owner are not exposed to this token.
-
-Minimum access needed to complete or repeat this inventory is a Dokploy member
-or custom role scoped to this project and both environments with read access to
-services, domains, deployments, logs, volumes, and backups. No create, update,
-deploy, stop, delete, environment-variable-value, Docker-host, or audit-log
-permission is needed.
+The inventory identity cannot list members (`member.read: false`), so this
+runbook records observed ownership roles rather than guessing a person's name.
 
 ## Production
 
+### Identity and risk
+
 | Field | Observed value |
 | --- | --- |
-| Purpose | Public CoralSend service |
-| Risk | Critical: public production routing and transfer connectivity |
-| Environment | `production` |
 | Environment ID | `Dh-j1t9c1Wc2fGh0hLOh6` |
-| Default environment | Yes |
-| Environment-scoped variable names | None returned |
+| Dokploy default environment | Yes |
+| Purpose | Public production web application, signaling service, and TURN/STUN relay |
+| Risk | High. A change can interrupt the public UI, WebSocket signaling, or peer-connectivity relay path. |
 
-### Service inventory and reconciliation
+### Services and serving paths
 
-There are two conflicting observations from the same day:
+| Service | Type / ID | Runtime role | Serving path |
+| --- | --- | --- | --- |
+| `web` | Application / `S83f1I1OCuAAGsIngkCyf` | Next.js web UI, one replica on container port 3000 | `https://coralsend.com/` (including `/app`); Let's Encrypt HTTPS |
+| `server` | Application / `Qm2_JN3sld5nE-AJY_zie` | Go WebSocket signaling server, one replica on container port 8080 | `wss://coralsend.com/ws`; Let's Encrypt HTTPS termination |
+| `coturn` | Compose / `dyXJDl6vpwBgidyTm5uCm` | coturn 4.8.0 STUN/TURN relay | Direct, not reverse-proxied: `turn.coralsend.com:3478` over UDP/TCP, with relay ports 49160-49200 over UDP/TCP |
 
-| Evidence | Result |
-| --- | --- |
-| Earlier dashboard observation recorded in COR-22 | Four production services reported. The visible list included `coturn` (Compose), `web` (Application), and `server` (Application). The fourth service was not visible in the captured list. |
-| Read-only API snapshot at the time above | The project, environment, application search, Compose search, database searches, and project home summary all return zero services. Centralized deployment history is empty. |
-| Current deployment queue | Two preview-deployment jobs reference an inaccessible production Application ID, `S83f1I1OCuAAGsIngkCyf` (one active and one waiting at snapshot time). A direct read returns “You don't have access to this service.” |
+Public verification returned HTTP 200 for `/` and `/app`, HTTP 101 for a
+WebSocket upgrade at `/ws`, and HTTP 404 for `/health`. The TURN hostname and
+ports are bound directly by the raw Compose service and intentionally have no
+Dokploy Domain-tab entry.
 
-The fourth service is therefore **not reconciled**. The current evidence is
-consistent with either service removal, incomplete resource grants on the API
-token, or a transient control-plane inconsistency. It is not safe to infer that
-the fourth service is nginx, a database, a preview deployment, or any other
-resource.
+### Source and delivery
 
-### Public serving paths
+| Service | Source and build | Ref | Autodeploy and trigger |
+| --- | --- | --- | --- |
+| `web` | GitHub `twomodo/coralsend`; Dockerfile build from repository root using `deploy/Dockerfile.app` | `main` | Enabled; a GitHub `push` to `main` triggers a Dokploy build and deploy |
+| `server` | GitHub `twomodo/coralsend`; Dockerfile build from repository root using `deploy/Dockerfile.server` | `main` | Enabled; a GitHub `push` to `main` triggers a separate Dokploy build and deploy |
+| `coturn` | Raw Compose stored in Dokploy; no Git provider, repository, or branch is attached | None | The stored fields say autodeploy enabled / trigger `push`, but there is no Git source to receive a push. All three observed deployments are titled `Manual deployment`; treat deployment as manual. |
 
-Read-only HTTP and DNS probes observed:
+The latest successful non-preview deployment observed for both Applications is
+repository commit `d00cfdfae07287eee4fe874ee680a556ddbc6c58`. Production
+`web` has pull-request previews enabled (maximum three, wildcard
+`*.preview.coralsend.com`); `server` and `coturn` do not. A web preview therefore
+does not validate signaling or TURN behavior.
 
-| Endpoint | Observation | Runtime role supported by the observation |
-| --- | --- | --- |
-| `https://coralsend.com/` | HTTP 200, HTML | Public landing page |
-| `https://coralsend.com/app` | HTTP 200, HTML | Public application UI |
-| `https://coralsend.com/ws` | HTTP 400 to a plain HTTP request | A WebSocket/signaling route exists on the public origin; the probe did not perform an authenticated room connection |
-| `https://coralsend.com/health` | HTTP 404 | The server health endpoint is not publicly routed at this path |
-| `https://coralsend.612.ir/` | HTTP 404 | No working root route observed |
-| `https://turn.coralsend.612.ir/` | HTTP 404 | DNS resolves, but an HTTP probe does not verify TURN/STUN reachability |
+Repository image publishing is a separate path: `.github/workflows/docker.yml`
+publishes GHCR images, but these two live Applications are configured to build
+their Dockerfiles from GitHub source. A successful image workflow alone does
+not deploy production.
 
-The application and signaling routes are served on the same public domain.
-Which Dokploy service owns each route cannot be proven until resource-level
-service and domain reads work.
+### State, health, backups, logs, and rollback
 
-### Git source and deployment trigger
+- There are no Dokploy-managed databases in production.
+- `web` and `server` have no mounts. The raw `coturn` Compose definition has no
+  volumes. No service-level volume backups or Compose backups are configured,
+  so there is no backup retention policy for application data.
+- No container health check is configured for `web`, `server`, or `coturn`.
+  The server implements an internal `/health` handler, but the production
+  Dockerfile does not declare a health check and the route is not public.
+- Runtime and deployment logs are available to a scoped operator with
+  `logs.read`. Instance log cleanup is enabled daily at `0 0 * * *`; the API
+  does not expose an exact log-age retention limit. Metrics retention is two
+  days.
+- Automatic application rollback is disabled (`rollbackActive: false`). Both
+  Applications retain deployment history, but their records have no linked
+  rollback target. The production rollback procedure is to revert the
+  offending Git commit on `main`; the push then rebuilds `web` and `server`
+  independently. Confirm both deployments complete, then recheck `/`, `/app`,
+  and `/ws`.
+- `coturn` has manual deployment history but no Git ref or linked rollback
+  target. Its rollback is manual: restore the last known-good raw Compose
+  definition, deploy it, and validate direct UDP/TCP service. Preserve a
+  reviewed copy before any future edit because Dokploy is currently its source
+  of truth.
 
-The repository declares two image builds in
-`.github/workflows/docker.yml`: `coralsend-server` from
-`deploy/Dockerfile.server` and `coralsend-app` from
-`deploy/Dockerfile.app`. A push to `main`, a `v*` tag, or a manual workflow
-dispatch publishes branch/tag/SHA image tags to GHCR.
+### Secret references
 
-This proves the image-publish path, not the live deployment trigger. The live
-Dokploy repository/ref, image tag, autodeploy setting, watch paths, Dockerfile,
-and webhook/manual trigger are not readable with the current resource grant.
-No claim is made that a push to `main` automatically changes production.
+Only names are recorded:
 
-### Data, persistence, backups, health, logs, and rollback
+- `web`: `NEXT_PUBLIC_TURN_USER`, `NEXT_PUBLIC_TURN_PASS`, and
+  `NEXT_PUBLIC_POSTHOG_KEY` are present as build-time client configuration.
+- `server`: `HOST_SECRET`.
+- `coturn`: `TURN_USER` and `TURN_PASSWORD`.
+- GitHub access is provided by the Dokploy GitHub App reference; no provider
+  credential value belongs in this runbook.
 
-| Area | Observed live state | Repository declaration (not proof of live state) |
-| --- | --- | --- |
-| Datastores | No PostgreSQL, MySQL, MariaDB, MongoDB, Redis, or libSQL resource returned | CoralSend's signaling server is designed to avoid file storage |
-| Volumes | No live service volume is readable | `deploy/docker-compose.base.yml` declares `turn_data`; the current excerpt does not attach it to a service |
-| Backups and retention | No live backup or retention configuration is readable | No production retention policy is declared in the inspected deployment files |
-| Health checks | `/health` is not publicly routed | The server Compose definition checks `http://127.0.0.1:8080/health` every 30 seconds by default |
-| Logs | The token has log-read permission but lacks access to the referenced service | The repository does not define log retention |
-| Rollback | No verified Dokploy rollback runbook or successful rollback evidence is visible | GHCR publishes immutable commit-SHA tags; selecting a known-good SHA could support rollback only after the live service/image mapping is verified |
-
-The documented project-level variable names are the only live secret/config
-references available. Repository examples additionally declare names such as
-`HOST_SECRET`, TURN credentials, image references, origin controls, and public
-client configuration. Those example names are design inputs, not confirmation
-that equivalent live variables exist.
+`NEXT_PUBLIC_*` values are compiled into browser assets and must not be treated
+as server-only secrets.
 
 ## Develop
 
+### Identity and risk
+
 | Field | Observed value |
 | --- | --- |
-| Purpose | Development/integration environment |
-| Risk | High: expected pre-production validation path, but isolation and promotion cannot currently be verified |
-| Environment | `develop` |
 | Environment ID | `srfJM_vEieOlQfkPboBzi` |
-| Default environment | No |
-| Environment-scoped variable names | None returned |
+| Dokploy default environment | No |
+| Purpose | Shared integration deployment for the `develop` branch |
+| Risk | Medium. It is non-production, but it uses public routes and external TURN configuration and can expose integration regressions. |
 
-The earlier COR-22 dashboard observation recorded one Compose service named
-`app`. The current environment, Compose search, application search, database
-searches, and project summary return zero services. No develop domain, serving
-path, repository branch/ref, autodeploy setting, build trigger, datastore,
-volume, backup, health check, log retention, or rollback procedure can be
-verified from the current grant. No public develop hostname was inferred.
+### Service, containers, and serving paths
+
+Develop has one Dokploy service:
+
+| Service | Type / ID | Runtime role | Serving path |
+| --- | --- | --- | --- |
+| `app` | Compose / `gAeJtsVw0369CfaXzJZFu` | Compose project containing `app` (Next.js) and `server` (Go signaling) containers | `https://coralsend.twomodo.com/` routes to `app:3000`; `wss://coralsend.twomodo.com/ws` routes to `server:8080` |
+
+Public verification returned HTTP 200 for `/`, HTTP 101 for `/ws`, and HTTP
+404 for `/health`. The deployed Compose file is
+`./deploy/docker-compose.base.yml`; it contains no coturn container. Its client
+configuration instead references the external
+`turn.coralsend.twomodo.com:3478` STUN/TURN endpoint.
+
+### Source and delivery
+
+| Field | Observed value |
+| --- | --- |
+| GitHub repository | `twomodo/coralsend` |
+| Branch/ref | `develop` |
+| Compose path | `./deploy/docker-compose.base.yml` |
+| Autodeploy | Enabled |
+| Trigger | GitHub `push` to `develop` |
+| Build behavior | Compose builds the `app` and `server` containers from `deploy/Dockerfile.app` and `deploy/Dockerfile.server` |
+| Latest successful deployment observed | Commit `902b6f0fb37a37179ba443a9058b1d2ccfed9c63` |
+
+The live develop environment variable `APP_ENV` is set to `production`. That is
+an observed configuration detail, not environment parity, and should be
+considered when diagnosing behavior that depends on this flag.
+
+### State, health, backups, logs, and rollback
+
+- There are no Dokploy-managed databases and no Dokploy mounts. The deployed
+  Compose file declares `turn_data`, but neither live Compose container mounts
+  it; it is not application state.
+- No Compose backup or volume-backup job is configured, so no application-data
+  retention policy exists.
+- `server` has an internal curl health check on `127.0.0.1:8080/health`;
+  `app` waits for `server` to become healthy. `app` has no health check of its
+  own, and `/health` is not publicly routed.
+- Runtime/deployment logs use the same Dokploy access and instance cleanup
+  settings as production: `logs.read`, daily cleanup at `0 0 * * *`, exact
+  log-age retention not exposed, and two-day metrics retention.
+- There is no configured automatic rollback or linked rollback target. Revert
+  the offending commit on `develop`; the push triggers a full Compose rebuild.
+  Validate both `/` and `/ws` after the deployment completes.
+
+### Secret references
+
+Only names are recorded: `HOST_SECRET`, `NEXT_PUBLIC_TURN_USER`,
+`NEXT_PUBLIC_TURN_PASS`, `TURN_USER`, and `TURN_PASSWORD`. The Compose service
+also uses the Dokploy GitHub App reference; provider credential values are not
+part of this runbook.
 
 ## Production versus develop
 
 | Dimension | Production | Develop |
 | --- | --- | --- |
-| Environment ID | `Dh-j1t9c1Wc2fGh0hLOh6` | `srfJM_vEieOlQfkPboBzi` |
-| Earlier observed layout | At least `coturn` Compose plus `web` and `server` Applications; fourth service unknown | One `app` Compose |
-| Current API layout | Zero readable services; deployment queue references one inaccessible Application | Zero readable services |
-| Public routing | `coralsend.com` serves `/` and `/app`; `/ws` responds as a signaling route | Not observed |
-| Source/ref | Repository is known; live ref and trigger are not readable | Not observed |
-| Promotion path | Not verified. GHCR creates SHA tags from `main`, but no live Dokploy mapping or promotion control is visible | Not verified |
-| Rollback path | Not verified. A known-good SHA-tag redeploy is only a candidate after mapping and access are confirmed | Not verified |
+| Dokploy layout | Two Applications (`web`, `server`) plus raw `coturn` Compose | One Git-backed Compose service with `app` and `server` containers; no coturn container |
+| Public host | `coralsend.com` | `coralsend.twomodo.com` |
+| Git ref | Applications track `main`; coturn has no Git ref | Compose tracks `develop` |
+| Change trigger | Push to `main` independently builds/deploys `web` and `server`; coturn changes deploy manually | Push to `develop` rebuilds/deploys the whole Compose project |
+| Preview coverage | `web` PR previews only | No preview deployment configuration |
+| Health gating | No container health checks | `server` health gates `app` startup |
+| Persistent state / backups | No mounted application state; no configured backups | No mounted application state; unused `turn_data` declaration; no configured backups |
+| Automatic rollback | Disabled / not configured | Not configured |
 
-## Risks and required reconciliation
+### Promotion path
 
-1. **Inventory drift or access drift:** the dashboard snapshot and current API
-   disagree on every service count. A Dokploy owner must confirm whether the
-   five earlier services were removed and, if not, grant this operations token
-   read access to them.
-2. **Unknown fourth production service:** do not name or remove it based on
-   inference. Capture its type, ID, role, domains, source/ref, trigger, health,
-   persistence, backups, and rollback data from the live service page/API.
-3. **Uncontrolled preview activity:** the production queue references two
-   preview deployments for an unreadable Application. Confirm their owner,
-   source branch/commit, intended environment, and whether preview deployments
-   may attach production routes or variables.
-4. **Promotion and rollback are not auditable:** record the exact develop-to-
-   production approval/trigger and test a non-production rollback before using
-   this baseline for a launch decision.
-5. **Repository/runtime drift:** the README references
-   `deploy/docker-compose.dokploy.yml` and `deploy/docker-compose.prod.yml`, but
-   neither file exists on `main`. Reconcile documentation with the actual
-   Dokploy definitions in a separate reviewed change.
+1. Merge or push the change to `develop`; Dokploy rebuilds the develop Compose
+   service.
+2. Validate `https://coralsend.twomodo.com/` and
+   `wss://coralsend.twomodo.com/ws`.
+3. Promote by pull request/merge from `develop` to `main`. The observed
+   production history contains these merge commits, and the resulting `main`
+   push independently triggers production `web` and `server`.
+4. Confirm both production deployments reached the intended commit, then
+   validate `https://coralsend.com/`, `/app`, and `/ws`.
+5. Promote TURN changes separately through the manual `coturn` Compose process;
+   Git promotion does not touch it.
 
-Production configuration was not changed while collecting this evidence.
+### Principal risks
+
+- Production `web` and `server` deploy independently, so a shared commit is not
+  an atomic release.
+- A web PR preview exercises neither the production signaling service nor TURN.
+- Production coturn configuration is raw, manual, and not versioned by its live
+  service; rollback depends on preserving a known-good copy before change.
+- Develop and production have intentionally different topology, health gating,
+  hostnames, and TURN endpoints. A successful develop deploy does not prove
+  production configuration parity.
+- There are no configured application-data backups and no automatic rollback in
+  either environment.

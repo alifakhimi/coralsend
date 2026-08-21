@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sun, Moon, Monitor } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -9,59 +9,36 @@ const STORAGE_KEY = 'coralsend_theme';
 
 type Theme = 'light' | 'dark' | 'system';
 
-function getSystemTheme(): 'light' | 'dark' {
-  if (typeof window === 'undefined') return 'dark';
-  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-}
-
 function getStoredTheme(): Theme {
   if (typeof window === 'undefined') return 'system';
   const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
   return stored === 'light' || stored === 'dark' ? stored : 'system';
 }
 
-function getResolvedTheme(): 'light' | 'dark' {
-  const stored = getStoredTheme();
-  if (stored === 'light') return 'light';
-  if (stored === 'dark') return 'dark';
-  return getSystemTheme();
-}
-
-function applyTheme(stored: Theme, resolved: 'light' | 'dark') {
+function applyTheme(stored: Theme) {
   document.documentElement.classList.remove('light', 'dark');
   if (stored === 'light' || stored === 'dark') {
     document.documentElement.classList.add(stored);
   }
 }
 
+const subscribeToHydration = () => () => undefined;
+
 export function ThemeToggle({ className }: { className?: string }) {
   const [mode, setMode] = useState<Theme>(() => getStoredTheme());
-  const [resolved, setResolved] = useState<'light' | 'dark'>(() => getResolvedTheme());
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(subscribeToHydration, () => true, () => false);
 
   useEffect(() => {
-    setMounted(true);
     const stored = getStoredTheme();
-    const r = getResolvedTheme();
-    setMode(stored);
-    setResolved(r);
-    applyTheme(stored, r);
-  }, []);
-
-  useEffect(() => {
-    if (!mounted) return;
+    applyTheme(stored);
     const mq = window.matchMedia('(prefers-color-scheme: light)');
     const handler = () => {
       const currentStored = getStoredTheme();
-      if (currentStored === 'system') {
-        const next = getSystemTheme();
-        setResolved(next);
-        applyTheme('system', next);
-      }
+      if (currentStored === 'system') applyTheme('system');
     };
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
-  }, [mounted]);
+  }, []);
 
   const cycle = () => {
     const stored = getStoredTheme();
@@ -71,10 +48,8 @@ export function ThemeToggle({ className }: { className?: string }) {
     else next = 'system';
 
     localStorage.setItem(STORAGE_KEY, next);
-    const resolvedNext = next === 'system' ? getSystemTheme() : next;
     setMode(next);
-    setResolved(resolvedNext);
-    applyTheme(next, resolvedNext);
+    applyTheme(next);
   };
 
   if (!mounted) {

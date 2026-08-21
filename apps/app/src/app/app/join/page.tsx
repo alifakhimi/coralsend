@@ -14,8 +14,6 @@ import {
   ScanLine,
 } from 'lucide-react';
 
-const CODE_LENGTH = 6;
-
 export default function JoinRoomPage() {
   const router = useRouter();
   useEnsureDevice();
@@ -51,9 +49,9 @@ export default function JoinRoomPage() {
   }, [joinRoom, showToast]);
 
   const handleCodeSubmit = useCallback(() => {
-    const trimmed = code.trim().toUpperCase();
-    if (trimmed.length < CODE_LENGTH) {
-      showToast(`Enter a ${CODE_LENGTH}-character room code`, 'error');
+    const trimmed = code.trim();
+    if (!trimmed) {
+      showToast('Paste the complete secure invite', 'error');
       return;
     }
     setShowCodeSheet(false);
@@ -63,10 +61,13 @@ export default function JoinRoomPage() {
   useEffect(() => {
     if (showCodeSheet) {
       setTimeout(() => inputRef.current?.focus(), 100);
-    } else {
-      setCode('');
     }
   }, [showCodeSheet]);
+
+  const closeInviteSheet = useCallback(() => {
+    setShowCodeSheet(false);
+    setCode('');
+  }, []);
 
   return (
     <main className="page-shell safe-area overflow-hidden w-full max-w-2xl mx-auto h-dvh">
@@ -109,7 +110,7 @@ export default function JoinRoomPage() {
           </Button>
           <Button variant="secondary" className="flex-1" size="lg" onClick={() => setShowCodeSheet(true)}>
             <Keyboard className="w-4 h-4" />
-            Enter Code
+            Enter Invite
           </Button>
         </div>
       </div>
@@ -117,8 +118,8 @@ export default function JoinRoomPage() {
       {/* Enter Code BottomSheet */}
       <BottomSheet
         isOpen={showCodeSheet}
-        onClose={() => setShowCodeSheet(false)}
-        title="Enter Room Code"
+        onClose={closeInviteSheet}
+        title="Enter Secure Invite"
         icon={<Keyboard className="w-5 h-5 text-[var(--color-accent)]" />}
         footer={
           <div className="flex gap-3">
@@ -136,7 +137,7 @@ export default function JoinRoomPage() {
               className="flex-1"
               size="lg"
               onClick={handleCodeSubmit}
-              disabled={code.length < CODE_LENGTH}
+              disabled={!code.trim()}
             >
               Join Room
             </Button>
@@ -145,23 +146,22 @@ export default function JoinRoomPage() {
       >
         <div className="flex flex-col items-center gap-4 py-4">
           <p className="text-sm text-[var(--text-muted)] text-center">
-            Enter the {CODE_LENGTH}-character code shown on the other device
+            Paste the complete invite link or CS1 invite. A short room code alone cannot decrypt the room.
           </p>
           <input
             ref={inputRef}
             type="text"
             inputMode="text"
-            autoCapitalize="characters"
+            autoCapitalize="none"
             autoComplete="off"
-            maxLength={CODE_LENGTH}
-            placeholder="ABC123"
+            placeholder="CS1.ABC123.…"
             value={code}
-            onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+            onChange={(e) => setCode(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleCodeSubmit()}
-            className="w-full max-w-xs rounded-xl px-6 py-4 text-center font-mono text-2xl tracking-[0.3em] glass-strong border border-[var(--border-soft)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] placeholder:tracking-[0.3em] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] transition-shadow"
+            className="w-full rounded-xl px-4 py-3 font-mono text-sm glass-strong border border-[var(--border-soft)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] transition-shadow"
           />
           <p className="text-xs text-[var(--text-muted)]">
-            {code.length}/{CODE_LENGTH} characters
+            Invite keys stay on this device for the current tab only.
           </p>
         </div>
       </BottomSheet>

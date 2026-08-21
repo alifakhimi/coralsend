@@ -69,7 +69,6 @@ export function RoomView({
 }: RoomViewProps) {
   const currentRoom = useStore((s) => s.currentRoom);
   const showToast = useToastStore((s) => s.showToast);
-  const removeFile = useStore((s) => s.removeFile);
   const removeFiles = useStore((s) => s.removeFiles);
   const clearFilesByDirection = useStore((s) => s.clearFilesByDirection);
   const restoreFiles = useStore((s) => s.restoreFiles);
@@ -140,7 +139,6 @@ export function RoomView({
     setShowTrash(false);
     setEditMode(false);
     clearSelection();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
   // Paste button: Async Clipboard API (for mobile / programmatic paste)
@@ -227,8 +225,6 @@ export function RoomView({
   const unreadCount = showChat ? 0 : roomMessages.filter((m) => !m.isMe).length;
 
   if (!currentRoom) return null;
-  const roomName = currentRoom.name?.trim();
-
   const activeFiles = roomFiles.filter((f) => {
     if (f.direction !== activeTab) return false;
     if (activeTab === 'inbox') return showTrash ? !!f.trashed : !f.trashed;
@@ -247,11 +243,6 @@ export function RoomView({
       else next.add(fileId);
       return next;
     });
-  };
-
-  const handleDeleteSingle = (fileId: string) => {
-    if (activeTab === 'inbox' && showTrash) purgeFiles([fileId]);
-    else removeFile(fileId);
   };
 
   const handleDeleteSelected = () => {
@@ -527,7 +518,6 @@ export function RoomView({
               selectionMode={selectionMode}
               selectedIds={selectedIds}
               onToggleSelect={toggleSelect}
-              onDeleteSingle={handleDeleteSingle}
               hideHeader
               hideFilters
             />

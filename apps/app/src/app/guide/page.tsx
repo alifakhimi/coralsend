@@ -12,6 +12,7 @@ import { Step2Share } from '@/components/guide/Step2Share';
 import { Step3Outbox } from '@/components/guide/Step3Outbox';
 import { Button } from '@/components/ui';
 import { ArrowLeft } from 'lucide-react';
+import { clearStoredRoomKey, generateRoomKey, storeRoomKey } from '@/lib/crypto/secureInvite';
 
 export default function GuidePage() {
   const router = useRouter();
@@ -25,6 +26,7 @@ export default function GuidePage() {
 
   const handleCreateRoom = () => {
     const roomId = createRoomCode();
+    storeRoomKey(roomId, generateRoomKey());
     setGuideRoomId(roomId);
     connect(roomId, true);
     setStep(2);
@@ -36,6 +38,7 @@ export default function GuidePage() {
       return;
     }
     cleanup();
+    if (guideRoomId) clearStoredRoomKey(guideRoomId);
     useStore.getState().leaveRoom();
     setStep(1);
     setGuideRoomId(null);

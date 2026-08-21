@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
-import { extractRoomId, isValidUUID } from '@/lib/utils';
 import { WelcomeView } from '@/components/welcome/WelcomeView';
 import { getSiteUrl } from '@/lib/site';
 
@@ -38,7 +37,6 @@ export const metadata: Metadata = {
 };
 
 type PageSearchParams = {
-  room?: string | string[];
   'share-target'?: string | string[];
 };
 
@@ -53,15 +51,7 @@ export default async function WelcomePage({
   searchParams: Promise<PageSearchParams>;
 }) {
   const params = await searchParams;
-  const roomParam = firstParam(params.room);
   const shareTarget = firstParam(params['share-target']);
-
-  if (roomParam) {
-    const roomId = extractRoomId(roomParam) || roomParam.toUpperCase();
-    if (/^[A-Z0-9]{6}$/.test(roomId) || isValidUUID(roomId)) {
-      redirect(`/room/${roomId}`);
-    }
-  }
 
   if (shareTarget === '1') {
     redirect('/app?share-target=1');

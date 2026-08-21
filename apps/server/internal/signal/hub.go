@@ -1,18 +1,15 @@
 package signal
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"log"
-	"os"
 	"sync"
 	"time"
 )
 
 // Message represents the signaling data exchanged between peers
 type Message struct {
+	Version  int             `json:"version"`
 	Type     string          `json:"type"` // join, offer, answer, candidate, file-meta, member-list, etc.
 	RoomID   string          `json:"roomId"`
 	DeviceID string          `json:"deviceId,omitempty"`
@@ -22,26 +19,8 @@ type Message struct {
 
 // MemberInfo represents a room member
 type MemberInfo struct {
-	DeviceID    string `json:"deviceId"`
-	DisplayName string `json:"displayName"`
-	JoinedAt    int64  `json:"joinedAt"`
-	Status      string `json:"status"`
-}
-
-type RoomSettings struct {
-	MaxMembers      int    `json:"maxMembers"`
-	AutoExpire      string `json:"autoExpire"`
-	RequireApproval bool   `json:"requireApproval"`
-	HostManagement  bool   `json:"hostManagement"`
-}
-
-func defaultRoomSettings() RoomSettings {
-	return RoomSettings{
-		MaxMembers:      8,
-		AutoExpire:      "never",
-		RequireApproval: false,
-		HostManagement:  false,
-	}
+	DeviceID string `json:"deviceId"`
+	JoinedAt int64  `json:"joinedAt"`
 }
 
 // Hub maintains the set of active clients and broadcasts messages to the rooms
@@ -84,56 +63,21 @@ func NewHub() *Hub {
 	}
 }
 
-func getHostSecret() []byte {
-	secret := os.Getenv("HOST_SECRET")
-	if secret == "" {
-		return []byte("dev-host-secret-change-in-production")
+func (h *Hub) hasMember(roomID, deviceID string) bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for client := range h.rooms[roomID] {
+		if client.DeviceID == deviceID {
+			return true
+		}
 	}
-	return []byte(secret)
-}
-
-func (h *Hub) generateHostToken(roomID string) string {
-	mac := hmac.New(sha256.New, getHostSecret())
-	mac.Write([]byte(roomID))
-	return hex.EncodeToString(mac.Sum(nil))
-}
-
-func (h *Hub) verifyHostToken(roomID, token string) bool {
-	expected := h.generateHostToken(roomID)
-	return hmac.Equal([]byte(expected), []byte(token))
-}
-
-func (h *Hub) isHost(roomID, deviceID string) bool {
-	hostID, ok := h.roomHosts[roomID]
-	return ok && hostID == deviceID
-}
-
-// CanPerformHostAction returns true only when hostManagement is ON AND token is valid AND requester is host.
-// When hostManagement is OFF, no one can perform host actions (approve/remove).
-func (h *Hub) CanPerformHostAction(roomID, requesterDeviceID, hostToken string) bool {
-	settings, ok := h.roomSettings[roomID]
-	if !ok || !settings.HostManagement {
-		return false
-	}
-	return h.verifyHostToken(roomID, hostToken) && h.isHost(roomID, requesterDeviceID)
-}
-
-func parseAutoExpireDuration(value string) time.Duration {
-	switch value {
-	case "1h":
-		return time.Hour
-	case "24h":
-		return 24 * time.Hour
-	case "7d":
-		return 7 * 24 * time.Hour
-	default:
-		return 0
-	}
+	return false
 }
 
 func (h *Hub) sendToClient(client *Client, msgType string, payload interface{}) {
 	data, _ := json.Marshal(payload)
 	msg := &Message{
+		Version: ProtocolVersion,
 		Type:    msgType,
 		RoomID:  client.RoomID,
 		Payload: data,
@@ -150,10 +94,8 @@ func (h *Hub) getMemberList(roomID string) []MemberInfo {
 	if clients, ok := h.rooms[roomID]; ok {
 		for client := range clients {
 			members = append(members, MemberInfo{
-				DeviceID:    client.DeviceID,
-				DisplayName: client.DisplayName,
-				JoinedAt:    client.JoinedAt,
-				Status:      "online",
+				DeviceID: client.DeviceID,
+				JoinedAt: client.JoinedAt,
 			})
 		}
 	}
@@ -184,6 +126,7 @@ func (h *Hub) closeRoomLocked(roomID string, reason string) {
 	if clients, ok := h.rooms[roomID]; ok {
 		data, _ := json.Marshal(map[string]string{"reason": reason})
 		msg := &Message{
+			Version: ProtocolVersion,
 			Type:    "room-expired",
 			RoomID:  roomID,
 			Payload: data,
@@ -200,6 +143,7 @@ func (h *Hub) closeRoomLocked(roomID string, reason string) {
 	if pending, ok := h.pendingJoins[roomID]; ok {
 		data, _ := json.Marshal(map[string]string{"reason": reason})
 		msg := &Message{
+			Version: ProtocolVersion,
 			Type:    "room-expired",
 			RoomID:  roomID,
 			Payload: data,
@@ -235,10 +179,8 @@ func (h *Hub) removeClientLocked(roomID string, targetClient *Client, reason str
 	log.Printf("Client %s left room %s (%s)", targetClient.DeviceID, roomID, reason)
 
 	leftPayload, _ := json.Marshal(MemberInfo{
-		DeviceID:    targetClient.DeviceID,
-		DisplayName: targetClient.DisplayName,
-		JoinedAt:    targetClient.JoinedAt,
-		Status:      "offline",
+		DeviceID: targetClient.DeviceID,
+		JoinedAt: targetClient.JoinedAt,
 	})
 	memberLeftMsg := &Message{
 		Type:     "member-left",
@@ -274,10 +216,8 @@ func (h *Hub) registerClientLocked(client *Client) {
 
 	if roomSize > 1 {
 		memberPayload, _ := json.Marshal(MemberInfo{
-			DeviceID:    client.DeviceID,
-			DisplayName: client.DisplayName,
-			JoinedAt:    client.JoinedAt,
-			Status:      "online",
+			DeviceID: client.DeviceID,
+			JoinedAt: client.JoinedAt,
 		})
 
 		memberJoinedMsg := &Message{
@@ -372,10 +312,8 @@ func (h *Hub) HandleJoin(client *Client, settings *RoomSettings) {
 		h.pendingJoins[roomID][client.DeviceID] = client
 
 		requestPayload, _ := json.Marshal(MemberInfo{
-			DeviceID:    client.DeviceID,
-			DisplayName: client.DisplayName,
-			JoinedAt:    client.JoinedAt,
-			Status:      "connecting",
+			DeviceID: client.DeviceID,
+			JoinedAt: client.JoinedAt,
 		})
 		requestMsg := &Message{
 			Type:     "join-request",
@@ -449,10 +387,8 @@ func (h *Hub) RemoveClient(roomID string, targetDeviceID string, removedBy strin
 	}(targetClient)
 
 	leftPayload, _ := json.Marshal(MemberInfo{
-		DeviceID:    targetClient.DeviceID,
-		DisplayName: targetClient.DisplayName,
-		JoinedAt:    targetClient.JoinedAt,
-		Status:      "offline",
+		DeviceID: targetClient.DeviceID,
+		JoinedAt: targetClient.JoinedAt,
 	})
 	memberLeftMsg := &Message{
 		Type:     "member-left",
@@ -575,6 +511,7 @@ func (h *Hub) broadcastMemberList(roomID string) {
 	payload, _ := json.Marshal(members)
 
 	msg := &Message{
+		Version: ProtocolVersion,
 		Type:    "member-list",
 		RoomID:  roomID,
 		Payload: payload,
@@ -632,10 +569,8 @@ func (h *Hub) Run() {
 						// Notify remaining clients about member leaving
 						if len(h.rooms[roomID]) > 0 {
 							memberPayload, _ := json.Marshal(MemberInfo{
-								DeviceID:    client.DeviceID,
-								DisplayName: client.DisplayName,
-								JoinedAt:    client.JoinedAt,
-								Status:      "offline",
+								DeviceID: client.DeviceID,
+								JoinedAt: client.JoinedAt,
 							})
 							memberLeftMsg := &Message{
 								Type:     "member-left",

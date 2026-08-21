@@ -1,33 +1,16 @@
-# CoralSend Risk Register
+# CoralSend risk register
 
-## Objective
+| ID | Risk | Severity | Mitigation / evidence | Status |
+| --- | --- | --- | --- | --- |
+| R-001 | Cross-origin signaling abuse | High | Exact production `ALLOWED_ORIGINS`, fail-fast config, WS/HTTP checks | Mitigated; monitor |
+| R-002 | Proxy spoofing and unbounded limiter state | High | `TRUSTED_PROXY_CIDRS`, ignored forwarded headers otherwise, deterministic stale-key eviction | Mitigated; monitor |
+| R-003 | Plaintext signaling or downgrade | Critical | Protocol v1 envelopes, first-message join, typed rejection and close 1008, no v0 fallback | Mitigated by tests |
+| R-004 | AES-GCM nonce/counter reuse or transfer corruption | Critical | Random room IVs, bounded replay cache, per-recipient transfer keys, counter frames, final totals | Needs independent review |
+| R-005 | Invite/content leakage through browser surfaces | Critical | Fragment stripping, per-tab key storage, redacted persistence, allow-listed analytics, log rules | Needs browser/manual audit |
+| R-006 | Malicious authorized recipient or compromised endpoint/build | Critical | Explicitly outside cryptographic boundary; CSP/build integrity and endpoint controls needed | Accepted / open |
+| R-007 | No peer identity, forward secrecy, or cryptographic revocation | High | Explicit product limitation; possession of invite is authorization | Accepted for v1 |
+| R-008 | TURN credentials are public browser configuration | High | Treat as scoped service credentials; rate limits, rotation, monitoring, short-lived credentials are future work | Open |
+| R-009 | Dependency vulnerabilities | High | Locked installs and gated builds; review and upgrade dependencies without unreviewed `audit fix` | Open |
+| R-010 | Browser-specific transfer failures | High | Chromium E2E plus mandatory real Chrome/Firefox/Safari checklist | Open until release evidence |
 
-Track top platform risks with clear ownership, mitigation, and due dates.
-
-## Risk Table
-
-| ID | Risk | Severity | Owner | Mitigation | Target Date | Status |
-| --- | --- | --- | --- | --- | --- | --- |
-| R-001 | Unrestricted CORS and WebSocket origin acceptance enables unauthorized cross-origin usage and abuse. | C0 | Engineering | Enforce env-driven origin allowlist for HTTP + WS and reject unknown origins in production. | 2026-02-27 | Planned |
-| R-002 | No signaling rate limit can lead to denial-of-service and TURN cost spikes. | C0 | Engineering | Add IP-based rate limit on `/ws` handshake or join path with deterministic rejection. | 2026-02-27 | Planned |
-| R-003 | Missing legal baseline (Privacy/Terms/AUP) increases legal and trust risk for public rollout. | C0 | Founder + Legal | Publish legal pages and link from entry points. | 2026-02-27 | Planned |
-| R-004 | Missing explicit repo licensing strategy blocks commercial clarity for SaaS and self-host offerings. | C0 | Founder + Legal | Add AGPL license, commercial terms, trademark policy, and plain-language licensing doc. | 2026-02-27 | Planned |
-| R-005 | Current security messaging may be interpreted as full E2EE despite MVP limitations. | C1 | Product + Engineering | Keep explicit wording that app-layer E2EE is not yet implemented and align all pages with README. | 2026-03-05 | Planned |
-| R-006 | TURN credentials leak can permit relay abuse and cost escalation. | C1 | Ops | Move secrets to managed store, define rotation policy, remove exposure in logs/config samples. | 2026-03-05 | Planned |
-| R-007 | Analytics identifiers without clear disclosure can create privacy compliance risk. | C1 | Product + Legal | Document telemetry purpose, identifiers used, retention window, and opt-out path in privacy page. | 2026-03-05 | Planned |
-
-## Mitigation Notes
-
-- C0 risks are blockers for production rollout.
-- C1 risks should be scheduled immediately after C0 completion.
-
-## Open Decisions
-
-- Governing law and venue for commercial terms.
-- Final retention windows for logs and analytics.
-- Production criteria for enabling analytics by default.
-
-## Assumptions and Limits
-
-- Dates are initial targets and may be refined after legal review.
-- This register is a lightweight operational tool, not a complete enterprise GRC system.
+No entry in this register is a certification or audit statement. Independent review and operational validation remain production blockers.

@@ -10,6 +10,7 @@ import { RoomView } from '@/components/views/RoomView';
 import { DebugPanel } from '@/components/ui/DebugPanel';
 import { Loader2, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui';
+import { clearStoredRoomKey, consumeInviteFromLocation } from '@/lib/crypto/secureInvite';
 
 const LEAVE_TIMEOUT_MS = 10_000;
 
@@ -47,6 +48,9 @@ export default function RoomPage() {
     rejectJoinRequest,
   } = useWebRTC();
   const currentRoom = useStore((s) => s.currentRoom);
+  const currentRoomId = currentRoom?.id;
+  const roomAutoExpire = currentRoom?.settings.autoExpire;
+  const roomLastActivityAt = currentRoom?.lastActivityAt;
   const status = useStore((s) => s.status);
   const error = useStore((s) => s.error);
   const showToast = useToastStore((s) => s.showToast);
@@ -68,14 +72,26 @@ export default function RoomPage() {
 
     // Validate room code
     if (!/^[A-Z0-9]{6}$/.test(extractedRoomId) && !isValidUUID(extractedRoomId)) {
-      console.error('Invalid room code:', extractedRoomId);
+      console.error('Invalid room code');
+      router.push('/app');
+      return;
+    }
+
+    try {
+      if (!consumeInviteFromLocation(extractedRoomId)) {
+        showToast('A complete secure invite is required', 'error');
+        router.push('/app');
+        return;
+      }
+    } catch {
+      showToast('The secure invite is invalid', 'error');
       router.push('/app');
       return;
     }
 
     // Only connect if not already in this room or connecting
-    if (currentRoom?.id === extractedRoomId) {
-      console.log('Already in room:', extractedRoomId);
+    if (currentRoomId === extractedRoomId) {
+      console.log('Already in requested room');
       return;
     }
 
@@ -90,7 +106,7 @@ export default function RoomPage() {
     // call joinRoom instead of createRoom.
     const isCreate = isCreatorRef.current;
 
-    console.log('Joining room from URL:', extractedRoomId, isCreate ? '(creating)' : '(joining)');
+    console.log(isCreate ? 'Creating secure room' : 'Joining secure room');
 
     // Clean URL (once) after reading the create flag
     if (isCreate && typeof window !== 'undefined' && window.location.search.includes('create=true')) {
@@ -99,18 +115,17 @@ export default function RoomPage() {
     }
 
     connect(extractedRoomId, isCreate);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [normalizedRoomId, currentRoom?.id, status, isLeaving]);
+  }, [connect, currentRoomId, isLeaving, normalizedRoomId, router, showToast, status]);
 
   // Inject pending share files (from PWA share_target) into Outbox when room is ready
   useEffect(() => {
-    if (!currentRoom || currentRoom.id !== normalizedRoomId) return;
+    if (currentRoomId !== normalizedRoomId) return;
     const store = useStore.getState();
     const pending = store.pendingShareFiles;
     if (pending.length === 0) return;
     pending.forEach((file) => shareFile(file));
     store.clearPendingShareFiles();
-  }, [currentRoom?.id, normalizedRoomId, shareFile]);
+  }, [currentRoomId, normalizedRoomId, shareFile]);
 
   const forceNavigate = useCallback(() => {
     if (hasNavigatedRef.current) return;
@@ -132,6 +147,7 @@ export default function RoomPage() {
 
     // Cleanup connections (send leave, close ws, peers)
     cleanup(savedRoomId ?? undefined);
+    if (savedRoomId) clearStoredRoomKey(savedRoomId);
 
     // Navigate
     forceNavigate();
@@ -154,32 +170,28 @@ export default function RoomPage() {
     const savedRoomId = useStore.getState().currentRoom?.id;
     useStore.getState().leaveRoom();
     cleanup(savedRoomId ?? undefined);
+    if (savedRoomId) clearStoredRoomKey(savedRoomId);
     hasNavigatedRef.current = true;
     const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
     window.location.assign(`${basePath}/app` || '/app');
   }, [cleanup]);
 
   useEffect(() => {
-    if (!currentRoom) return;
-    const autoExpire = currentRoom.settings.autoExpire;
+    if (!currentRoomId || !roomAutoExpire || roomLastActivityAt == null) return;
+    const autoExpire = roomAutoExpire;
     if (autoExpire === 'never') return;
     const expirationMs = autoExpire === '1h'
       ? 60 * 60 * 1000
       : autoExpire === '24h'
         ? 24 * 60 * 60 * 1000
         : 7 * 24 * 60 * 60 * 1000;
-    const remaining = currentRoom.lastActivityAt + expirationMs - Date.now();
-    if (remaining <= 0) {
-      showToast('Room auto-closed due to inactivity', 'error');
-      leaveRoom();
-      return;
-    }
+    const remaining = roomLastActivityAt + expirationMs - Date.now();
     const timer = window.setTimeout(() => {
       showToast('Room auto-closed due to inactivity', 'error');
       leaveRoom();
-    }, remaining);
+    }, Math.max(0, remaining));
     return () => window.clearTimeout(timer);
-  }, [currentRoom?.id, currentRoom?.settings.autoExpire, currentRoom?.lastActivityAt, leaveRoom, showToast]);
+  }, [currentRoomId, leaveRoom, roomAutoExpire, roomLastActivityAt, showToast]);
 
   // Show leave overlay when leaving (even if currentRoom was cleared)
   if (isLeaving) {

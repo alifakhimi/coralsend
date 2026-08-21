@@ -13,6 +13,7 @@ services:
       - HOST_SECRET=${HOST_SECRET:-SetForProduction}
       - RATE_LIMIT_WINDOW=${RATE_LIMIT_WINDOW:-60}
       - RATE_LIMIT_MAX_REQUESTS=${RATE_LIMIT_MAX_REQUESTS:-120}
+      - TRUSTED_PROXY_CIDRS=${TRUSTED_PROXY_CIDRS:-}
     expose:
       - "${SERVER_PORT:-8080}"
     restart: unless-stopped

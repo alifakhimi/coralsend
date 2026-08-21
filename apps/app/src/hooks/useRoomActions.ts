@@ -5,9 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useStore } from '@/store/store';
 import { analytics } from '@/lib/analytics';
 import { generateRoomCode } from '@/lib/roomCode';
-import { extractRoomId, isValidUUID } from '@/lib/utils';
-
-const ROOM_CODE_REGEX = /^[A-Z0-9]{6}$/;
+import { buildSecureInviteUrl, generateRoomKey, parseSecureInvite, storeRoomKey } from '@/lib/crypto/secureInvite';
 
 /**
  * Reusable hook for room creation, join, and navigation.
@@ -33,7 +31,9 @@ export function useRoomActions() {
    */
   const createRoomAndNavigate = useCallback(() => {
     const roomId = generateRoomCode();
-    analytics.track('room_created', { roomId });
+    const key = generateRoomKey();
+    storeRoomKey(roomId, key);
+    analytics.track('room_created');
     // Persist creator status in sessionStorage before navigation.
     // sessionStorage survives hard refreshes (within the same tab), React Strict Mode
     // double-invocation, store resets, and reconnect calls — making it the most
@@ -41,8 +41,11 @@ export function useRoomActions() {
     if (typeof window !== 'undefined') {
       sessionStorage.setItem(`coralsend:creator:${roomId}`, '1');
     }
-    navigateToRoom(roomId, true);
-  }, [navigateToRoom]);
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+    const url = buildSecureInviteUrl(window.location.origin, roomId, key, basePath);
+    const parsed = new URL(url);
+    router.push(`${parsed.pathname}?create=true${parsed.hash}`);
+  }, [router]);
 
   /**
    * Join a room by room code or full URL. Validates format; on success navigates to room.
@@ -51,17 +54,22 @@ export function useRoomActions() {
    */
   const joinRoom = useCallback(
     (roomIdOrUrl: string): boolean => {
-      const roomId = extractRoomId(roomIdOrUrl) || roomIdOrUrl.trim().toUpperCase();
-      if (!ROOM_CODE_REGEX.test(roomId) && !isValidUUID(roomId)) {
-        useStore.getState().setError('Invalid room code format');
+      let invite;
+      try {
+        invite = parseSecureInvite(roomIdOrUrl);
+      } catch {
+        useStore.getState().setError('Paste the complete secure invite link or CS1 invite');
         return false;
       }
-      const normalized = isValidUUID(roomId) ? roomId : roomId.toUpperCase();
-      analytics.track('room_joined', { roomId: normalized });
-      navigateToRoom(normalized, false);
+      storeRoomKey(invite.roomId, invite.key);
+      analytics.track('room_joined');
+      const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+      const url = buildSecureInviteUrl(window.location.origin, invite.roomId, invite.key, basePath);
+      const parsed = new URL(url);
+      router.push(`${parsed.pathname}${parsed.hash}`);
       return true;
     },
-    [navigateToRoom]
+    [router]
   );
 
   return {

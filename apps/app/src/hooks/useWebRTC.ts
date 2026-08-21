@@ -1,44 +1,35 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { createFileWorker } from '@/lib/fileWorker';
 import {
   useStore,
-  type Member,
   type FileMetadata,
-  type ChatMessage,
-  type ConnectionPath,
   type AutoExpireValue,
 } from '@/store/store';
 import { getSignalingServerUrl, ICE_SERVERS } from '@/lib/constants';
 import { getDeviceId, getShortName } from '@/lib/deviceId';
 import { trackTransferAttempt, trackTransferCompleted, trackTransferFailed } from '@/lib/analytics/reliability';
 import { logger } from '@/lib/logger';
+import { PROTOCOL_VERSION, isEncryptedRelayType, parseWireMessage, type EncryptedPayloadV1, type WireMessageV1 } from '@/protocol';
+import { decryptPeerPayload } from '@/lib/crypto/roomCrypto';
+import { decryptTransferChunk, deriveTransferKey, readTransferFrameId } from '@/lib/crypto/transferCrypto';
+import { detectIcePath, parseCandidateType } from '@/lib/webrtc/ice';
+import { generateThumbnail, sameFileIdentity } from '@/lib/webrtc/fileMetadata';
+import { sendEncryptedDataControl, sendEncryptedSignal } from '@/lib/webrtc/signalingClient';
+import { sendEncryptedFile } from '@/lib/webrtc/transferSender';
+import {
+  copyTextBlobToClipboard,
+  finalizeReceivedFile as finalizeTransfer,
+  type FileMetadataPayload,
+} from '@/lib/webrtc/transferReceiver';
+import { closeAllPeers, closePeer } from '@/lib/webrtc/peerManager';
 
 // ============ Types ============
 
-type SignalMessage = {
-  type: string;
-  roomId: string;
-  deviceId?: string;
-  targetId?: string;
-  payload?: unknown;
-};
-
-type FileMetadataPayload = {
-  id: string;
-  name: string;
-  size: number;
-  type: string;
-  uploaderId: string;
-  uploaderName: string;
-  uploadedAt: number;
-  thumbnailUrl?: string;
-};
+type SignalMessage = WireMessageV1;
 
 type MemberPayload = {
   deviceId: string;
-  displayName: string;
+  displayName?: string;
   joinedAt: number;
-  status: string;
 };
 
 type ChatMessagePayload = {
@@ -48,6 +39,12 @@ type ChatMessagePayload = {
   timestamp: number;
 };
 
+interface FilePickerWindow extends Window {
+  showSaveFilePicker?: (options: { suggestedName: string }) => Promise<{
+    createWritable: () => Promise<FileSystemWritableFileStream>;
+  }>;
+}
+
 type RoomSettingsPayload = {
   maxMembers: number;
   autoExpire: AutoExpireValue;
@@ -55,139 +52,11 @@ type RoomSettingsPayload = {
   hostManagement: boolean;
 };
 
-type FileIdentity = {
-  name: string;
-  size: number;
-  type: string;
-  uploaderId: string;
-};
-
 // ============ Constants ============
 
-const FILE_ID_HEADER = 36;
-const CHUNK_SIZE = 64 * 1024; // 64KB payload (+ 36B header stays well under 256KB maxMessageSize)
 const BUFFER_LOW_THRESHOLD = 128 * 1024; // 128KB (2 chunks)
-const BUFFER_HIGH_THRESHOLD = 1024 * 1024; // 1MB (~16 chunks queued)
 const PROGRESS_UPDATE_BYTES = 256 * 1024; // Update UI every 256KB (avoids 0% for long time on large files)
-const THUMBNAIL_MAX_SIZE = 200; // Max thumbnail dimension
 const ICE_DIAGNOSTICS = process.env.NEXT_PUBLIC_ICE_DIAGNOSTICS === 'true';
-
-// ============ Helpers ============
-
-/**
- * Generate a thumbnail for an image file
- */
-async function generateThumbnail(file: File): Promise<string | undefined> {
-  if (!file.type.startsWith('image/')) return undefined;
-
-  try {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new window.Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-
-          // Scale down to max thumbnail size
-          if (width > height) {
-            if (width > THUMBNAIL_MAX_SIZE) {
-              height = Math.round((height * THUMBNAIL_MAX_SIZE) / width);
-              width = THUMBNAIL_MAX_SIZE;
-            }
-          } else {
-            if (height > THUMBNAIL_MAX_SIZE) {
-              width = Math.round((width * THUMBNAIL_MAX_SIZE) / height);
-              height = THUMBNAIL_MAX_SIZE;
-            }
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-
-          resolve(canvas.toDataURL('image/jpeg', 0.7));
-        };
-        img.onerror = () => resolve(undefined);
-        img.src = e.target?.result as string;
-      };
-      reader.onerror = () => resolve(undefined);
-      reader.readAsDataURL(file);
-    });
-  } catch {
-    return undefined;
-  }
-}
-
-function parseCandidateType(candidate: RTCIceCandidate | RTCIceCandidateInit): string {
-  const candidateValue = candidate.candidate ?? '';
-  const match = candidateValue.match(/\btyp\s+([a-zA-Z0-9]+)/);
-  return match?.[1] ?? 'unknown';
-}
-
-function sameFileIdentity(a: FileIdentity, b: FileIdentity): boolean {
-  return (
-    a.uploaderId === b.uploaderId &&
-    a.name === b.name &&
-    a.size === b.size &&
-    (a.type || 'application/octet-stream') === (b.type || 'application/octet-stream')
-  );
-}
-
-async function detectIcePath(pc: RTCPeerConnection, remoteDeviceId: string): Promise<ConnectionPath> {
-  try {
-    const stats = await pc.getStats();
-    let selectedPair: RTCStats | null = null;
-    const candidates = new Map<string, RTCStats>();
-
-    stats.forEach((report) => {
-      if (report.type === 'local-candidate' || report.type === 'remote-candidate') {
-        candidates.set(report.id, report);
-      }
-      if (report.type === 'candidate-pair') {
-        const pair = report as RTCStats & {
-          selected?: boolean;
-          state?: string;
-          localCandidateId?: string;
-          remoteCandidateId?: string;
-          nominated?: boolean;
-        };
-        if (pair.selected || pair.state === 'succeeded' || pair.nominated) {
-          selectedPair = pair;
-        }
-      }
-    });
-
-    if (!selectedPair) {
-      if (ICE_DIAGNOSTICS) logger.debug('ICE', `no selected candidate pair yet`, remoteDeviceId);
-      return 'unknown';
-    }
-
-    const pair = selectedPair as RTCStats & {
-      localCandidateId?: string;
-      remoteCandidateId?: string;
-      state?: string;
-    };
-    const local = pair.localCandidateId ? candidates.get(pair.localCandidateId) : undefined;
-    const remote = pair.remoteCandidateId ? candidates.get(pair.remoteCandidateId) : undefined;
-
-    const localType = (local as RTCStats & { candidateType?: string } | undefined)?.candidateType ?? 'unknown';
-    const remoteType = (remote as RTCStats & { candidateType?: string } | undefined)?.candidateType ?? 'unknown';
-    const localProtocol = (local as RTCStats & { protocol?: string } | undefined)?.protocol ?? 'unknown';
-    const remoteProtocol = (remote as RTCStats & { protocol?: string } | undefined)?.protocol ?? 'unknown';
-
-    logger.info('ICE', `selected pair state=${pair.state ?? 'unknown'} local=${localType}/${localProtocol} remote=${remoteType}/${remoteProtocol}`, remoteDeviceId);
-
-    const isRelay = localType === 'relay' || remoteType === 'relay';
-    return isRelay ? 'relay' : 'direct';
-  } catch (error) {
-    logger.warn('ICE', `failed to read selected candidate pair`, `${remoteDeviceId} ${error}`);
-    return 'unknown';
-  }
-}
-
 // ============ Hook ============
 
 export const useWebRTC = () => {
@@ -197,14 +66,19 @@ export const useWebRTC = () => {
   // Multi-peer connections: deviceId -> RTCPeerConnection
   const peers = useRef<Map<string, RTCPeerConnection>>(new Map());
   const dataChannels = useRef<Map<string, RTCDataChannel>>(new Map());
+  const pendingIceCandidates = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
 
   // File transfer state
   const pendingFiles = useRef<Map<string, File>>(new Map()); // fileId -> File
-  const incomingChunks = useRef<Map<string, { meta: FileMetadataPayload; chunks: (ArrayBuffer | Blob)[]; receivedBytes: number; startTime: number; lastUpdateBytes?: number }>>(new Map());
+  const incomingChunks = useRef<Map<string, { meta: FileMetadataPayload; chunks: (ArrayBuffer | Blob)[]; receivedBytes: number; startTime: number; lastUpdateBytes?: number; transferId: string; transferKey: CryptoKey; nextChunk: number; totalChunks: number }>>(new Map());
+  const incomingTransfers = useRef<Map<string, string>>(new Map());
   const earlyChunks = useRef<Map<string, ArrayBuffer[]>>(new Map()); // chunks arriving before file-start
   const receivedFileBlobs = useRef<Map<string, Blob>>(new Map()); // fileId -> Blob (text files only, for copy)
   const requestModes = useRef<Map<string, 'download' | 'copy'>>(new Map()); // requester intent by fileId
-  const fileWriters = useRef<Map<string, any>>(new Map()); // fileId -> FileSystemWritableFileStream
+  const fileWriters = useRef<Map<string, FileSystemWritableFileStream>>(new Map());
+  const sendFileToOneRef = useRef<(file: File, fileId: string, targetDeviceId: string) => Promise<void>>(
+    async () => undefined,
+  );
   const writeQueues = useRef<Map<string, Promise<void>>>(new Map()); // fileId -> Sequential Write Promise
   const sendAbortControllers = useRef<Map<string, AbortController>>(new Map()); // `${fileId}-${targetDeviceId}` -> AbortController
   const lastProgressReported = useRef<Map<string, number>>(new Map()); // fileId -> last % sent to sender
@@ -215,19 +89,17 @@ export const useWebRTC = () => {
     sendAbortControllers.current.forEach((ac) => ac.abort());
     sendAbortControllers.current.clear();
 
-    // Close all data channels
-    dataChannels.current.forEach((dc) => dc.close());
-    dataChannels.current.clear();
-
-    // Close all peer connections
-    peers.current.forEach((pc) => pc.close());
-    peers.current.clear();
+    closeAllPeers({
+      peers: peers.current,
+      dataChannels: dataChannels.current,
+      pendingIceCandidates: pendingIceCandidates.current,
+    });
 
     // Send explicit leave before closing so server removes us immediately
     const roomId = roomIdOverride ?? useStore.getState().currentRoom?.id;
     if (ws.current?.readyState === WebSocket.OPEN && roomId) {
       try {
-        ws.current.send(JSON.stringify({ type: 'leave', roomId }));
+        ws.current.send(JSON.stringify({ version: PROTOCOL_VERSION, type: 'leave', roomId }));
       } catch {
         // ignore
       }
@@ -244,6 +116,7 @@ export const useWebRTC = () => {
     }
 
     incomingChunks.current.clear();
+    incomingTransfers.current.clear();
     pendingFiles.current.clear();
     receivedFileBlobs.current.clear();
     requestModes.current.clear();
@@ -256,62 +129,43 @@ export const useWebRTC = () => {
 
   // ============ File Actions ============
 
-  const copyTextBlobToClipboard = useCallback(async (blob: Blob): Promise<boolean> => {
-    try {
-      const text = await blob.text();
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      return false;
-    }
-  }, []);
-
-  const triggerDownload = useCallback((meta: FileMetadataPayload, blob: Blob) => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = meta.name;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, []);
-
   const finalizeReceivedFile = useCallback(async (fileId: string, meta: FileMetadataPayload, chunks: (ArrayBuffer | Blob)[]) => {
-    const blob = new Blob(chunks, { type: meta.type });
-    if (meta.type.startsWith('text/')) {
-      receivedFileBlobs.current.set(fileId, blob);
-    }
-
     const mode = requestModes.current.get(fileId) ?? 'download';
     requestModes.current.delete(fileId);
-
-    if (mode === 'copy' && meta.type.startsWith('text/')) {
-      const copied = await copyTextBlobToClipboard(blob);
-      if (!copied) {
-        // Clipboard can fail due to permissions; fallback to normal download.
-        triggerDownload(meta, blob);
-      }
-      return;
-    }
-
-    triggerDownload(meta, blob);
-  }, [copyTextBlobToClipboard, triggerDownload]);
+    await finalizeTransfer({
+      fileId,
+      metadata: meta,
+      chunks,
+      mode,
+      receivedTextFiles: receivedFileBlobs.current,
+    });
+  }, []);
 
   // ============ Data Channel Handling ============
 
-  const handleDataMessage = useCallback((senderDeviceId: string, data: unknown) => {
+  const handleDataMessage = useCallback(async (senderDeviceId: string, data: unknown) => {
     const store = useStore.getState();
 
     // String messages (control messages)
     if (typeof data === 'string') {
       try {
-        const msg = JSON.parse(data);
+        let msg = JSON.parse(data) as { version?: number; type?: string; payload?: unknown };
+        const roomId = store.currentRoom?.id;
+        const myDeviceId = store.deviceId;
+        if (!roomId || !myDeviceId || msg.version !== PROTOCOL_VERSION || !msg.type || !msg.payload) return;
+        if (['file-start', 'file-end', 'file-progress', 'file-cancel'].includes(msg.type)) {
+          msg = {
+            ...msg,
+            payload: await decryptPeerPayload(roomId, msg.type, senderDeviceId, myDeviceId, msg.payload as EncryptedPayloadV1),
+          };
+        }
 
         if (msg.type === 'file-start') {
           // Receiving file data start
-          const meta = msg.payload as FileMetadataPayload;
-          logger.info('Transfer', `Receiving file: ${meta.name}`, senderDeviceId);
+          const start = msg.payload as FileMetadataPayload & { transferId: string; salt: string; totalChunks: number };
+          const meta = start;
+          const transferKey = await deriveTransferKey(roomId, meta.id, senderDeviceId, myDeviceId, start.transferId, start.salt);
+          logger.info('Transfer', 'Receiving encrypted file');
 
           // Ensure file exists in store (in case file-meta was missed)
           const existingFile = store.currentRoom?.files.find(f => f.id === meta.id);
@@ -340,10 +194,11 @@ export const useWebRTC = () => {
               });
             }
             writeQueues.current.set(meta.id, q);
-            incomingChunks.current.set(meta.id, { meta, chunks: [], receivedBytes, startTime: Date.now(), lastUpdateBytes: 0 });
+            incomingChunks.current.set(meta.id, { meta, chunks: [], receivedBytes, startTime: Date.now(), lastUpdateBytes: 0, transferId: start.transferId, transferKey, nextChunk: 0, totalChunks: start.totalChunks });
           } else {
-            incomingChunks.current.set(meta.id, { meta, chunks: buffered ? [...buffered] : [], receivedBytes, startTime: Date.now(), lastUpdateBytes: 0 });
+            incomingChunks.current.set(meta.id, { meta, chunks: buffered ? [...buffered] : [], receivedBytes, startTime: Date.now(), lastUpdateBytes: 0, transferId: start.transferId, transferKey, nextChunk: 0, totalChunks: start.totalChunks });
           }
+          incomingTransfers.current.set(start.transferId, meta.id);
           
           earlyChunks.current.delete(meta.id);
           if (buffered) {
@@ -354,17 +209,22 @@ export const useWebRTC = () => {
 
         } else if (msg.type === 'file-end') {
           // File transfer complete
-          const fileId = msg.fileId;
+          const end = msg.payload as { fileId: string; transferId: string; totalChunks: number; totalBytes: number };
+          const fileId = end.fileId;
           const incoming = incomingChunks.current.get(fileId);
 
           if (incoming) {
+            if (incoming.transferId !== end.transferId || incoming.nextChunk !== end.totalChunks || incoming.receivedBytes !== end.totalBytes) {
+              store.updateFileStatus(fileId, 'error');
+              throw new Error('Encrypted transfer was truncated');
+            }
             // Ensure sender's avatar shows 100% before we remove downloader
             const dc = dataChannels.current.get(senderDeviceId);
             if (dc?.readyState === 'open') {
-              dc.send(JSON.stringify({ type: 'file-progress', fileId, progress: 100 }));
+              void sendEncryptedDataControl(dc, roomId, myDeviceId, senderDeviceId, 'file-progress', { fileId, progress: 100 });
             }
             trackTransferCompleted(incoming.meta.size, Date.now() - incoming.startTime);
-            logger.info('Transfer', `File transfer complete: ${incoming.meta.name}`);
+            logger.info('Transfer', 'Encrypted file transfer complete');
             store.updateFileStatus(fileId, 'completed');
             
             const writer = fileWriters.current.get(fileId);
@@ -389,12 +249,13 @@ export const useWebRTC = () => {
               }
             }, 5000);
             incomingChunks.current.delete(fileId);
+            incomingTransfers.current.delete(incoming.transferId);
             earlyChunks.current.delete(fileId);
             lastProgressReported.current.delete(fileId);
           }
         } else if (msg.type === 'file-progress') {
           // Receiver reports progress back to sender (for avatar display)
-          const { fileId: fid, progress: pct } = msg as { fileId: string; progress: number };
+          const { fileId: fid, progress: pct } = msg.payload as { fileId: string; progress: number };
           if (typeof fid === 'string' && typeof pct === 'number') {
             store.updateFileDownloaderProgress(fid, senderDeviceId, Math.min(100, Math.max(0, pct)));
             // Only remove downloader when receiver has actually received 100% (not when sender's buffer is done)
@@ -404,7 +265,7 @@ export const useWebRTC = () => {
           }
         } else if (msg.type === 'file-cancel') {
           // Receiver cancelled download - abort send to that requester
-          const { fileId: fid } = msg as { fileId: string };
+          const { fileId: fid } = msg.payload as { fileId: string };
           if (typeof fid === 'string') {
             const key = `${fid}-${senderDeviceId}`;
             const ac = sendAbortControllers.current.get(key);
@@ -415,21 +276,29 @@ export const useWebRTC = () => {
             store.removeFileDownloader(fid, senderDeviceId);
           }
         }
-      } catch (e) {
-        console.log('Received text:', data);
+      } catch {
+        logger.warn('Transfer', 'Rejected invalid encrypted control message');
       }
       return;
     }
 
     // Binary data (file chunks) with fileId prefix
     if (data instanceof ArrayBuffer) {
-      const decoder = new TextDecoder();
-      const fileIdBytes = data.slice(0, FILE_ID_HEADER);
-      const fileId = decoder.decode(fileIdBytes).trim();
-      const chunk = data.slice(FILE_ID_HEADER);
+      const transferId = readTransferFrameId(data);
+      const fileId = incomingTransfers.current.get(transferId);
+      if (!fileId) return;
 
       const incoming = incomingChunks.current.get(fileId);
       if (incoming) {
+        let chunk: ArrayBuffer;
+        try {
+          chunk = await decryptTransferChunk(incoming.transferKey, data, incoming.transferId, incoming.nextChunk);
+          incoming.nextChunk += 1;
+        } catch (error) {
+          store.updateFileStatus(fileId, 'error');
+          logger.error('Transfer', 'Encrypted chunk rejected', String(error));
+          return;
+        }
         incoming.receivedBytes += chunk.byteLength;
 
         const writer = fileWriters.current.get(fileId);
@@ -470,24 +339,9 @@ export const useWebRTC = () => {
           lastProgressReported.current.set(fileId, progress);
           const dc = dataChannels.current.get(senderDeviceId);
           if (dc?.readyState === 'open') {
-            dc.send(JSON.stringify({ type: 'file-progress', fileId, progress }));
+            void sendEncryptedDataControl(dc, store.currentRoom!.id, store.deviceId!, senderDeviceId, 'file-progress', { fileId, progress });
           }
         }
-      } else {
-        const file = store.currentRoom?.files.find(f => f.id === fileId);
-        if (file?.status !== 'downloading') {
-          // Ignore late chunks from cancelled transfers
-          return;
-        }
-
-        // Buffer chunks that arrive before their file-start message
-        let buf = earlyChunks.current.get(fileId);
-        if (!buf) {
-          buf = [];
-          earlyChunks.current.set(fileId, buf);
-          logger.debug('Transfer', `Buffering early chunks for fileId: ${fileId}`);
-        }
-        buf.push(chunk);
       }
     }
   }, [finalizeReceivedFile]);
@@ -518,7 +372,7 @@ export const useWebRTC = () => {
       logger.error('DataChannel', `error with ${remoteDeviceId}`, detail);
     };
 
-    channel.onmessage = (event) => handleDataMessage(remoteDeviceId, event.data);
+    channel.onmessage = (event) => { void handleDataMessage(remoteDeviceId, event.data); };
 
     dataChannels.current.set(remoteDeviceId, channel);
   }, [handleDataMessage]);
@@ -527,13 +381,11 @@ export const useWebRTC = () => {
 
   // Clean up peer connection
   const cleanupPeerConnection = useCallback((remoteDeviceId: string) => {
-    const pc = peers.current.get(remoteDeviceId);
-    if (pc) {
-      console.log('Cleaning up peer connection with', remoteDeviceId);
-      pc.close();
-      peers.current.delete(remoteDeviceId);
-    }
-    dataChannels.current.delete(remoteDeviceId);
+    closePeer({
+      peers: peers.current,
+      dataChannels: dataChannels.current,
+      pendingIceCandidates: pendingIceCandidates.current,
+    }, remoteDeviceId);
   }, []);
 
 
@@ -561,16 +413,13 @@ export const useWebRTC = () => {
 
     pc.onicecandidate = (event) => {
       if (ICE_DIAGNOSTICS && event.candidate) {
-        const candidateType = parseCandidateType(event.candidate);
-        console.log(`[ICE][${remoteDeviceId}] local candidate: ${candidateType}`);
+        logger.debug('ICE', `Local ${parseCandidateType(event.candidate)} candidate gathered`);
       }
       if (event.candidate && ws.current?.readyState === WebSocket.OPEN) {
-        ws.current.send(JSON.stringify({
-          type: 'candidate',
-          roomId: useStore.getState().currentRoom?.id,
-          targetId: remoteDeviceId,
-          payload: event.candidate,
-        }));
+        const state = useStore.getState();
+        if (state.currentRoom?.id && state.deviceId) {
+          void sendEncryptedSignal(ws.current, state.currentRoom.id, state.deviceId, 'candidate', event.candidate, remoteDeviceId);
+        }
       }
     };
 
@@ -619,12 +468,7 @@ export const useWebRTC = () => {
                 const offer = await newPc.createOffer();
                 await newPc.setLocalDescription(offer);
 
-                ws.current?.send(JSON.stringify({
-                  type: 'offer',
-                  roomId: room.id,
-                  targetId: remoteDeviceId,
-                  payload: offer,
-                }));
+                void sendEncryptedSignal(ws.current, room.id, myDeviceId, 'offer', offer, remoteDeviceId);
               } catch (err) {
                 console.error('Failed to retry ICE connection:', err);
                 retryStore.updateMemberStatus(remoteDeviceId, 'offline');
@@ -637,9 +481,7 @@ export const useWebRTC = () => {
 
     pc.onicecandidateerror = (event) => {
       if (ICE_DIAGNOSTICS) {
-        console.warn(
-          `[ICE][${remoteDeviceId}] candidate error: ${event.errorCode} ${event.errorText} (${event.url || 'no-url'}) raw:`, event
-        );
+        logger.warn('ICE', `Candidate gathering failed with code ${event.errorCode}`);
       }
     };
 
@@ -685,12 +527,7 @@ export const useWebRTC = () => {
                 const offer = await newPc.createOffer();
                 await newPc.setLocalDescription(offer);
 
-                ws.current?.send(JSON.stringify({
-                  type: 'offer',
-                  roomId: room.id,
-                  targetId: remoteDeviceId,
-                  payload: offer,
-                }));
+                void sendEncryptedSignal(ws.current, room.id, myDeviceId, 'offer', offer, remoteDeviceId);
               } catch (err) {
                 console.error('Failed to retry connection:', err);
                 retryStore.updateMemberStatus(remoteDeviceId, 'offline');
@@ -726,12 +563,26 @@ export const useWebRTC = () => {
     if (!roomId || !myDeviceId) return;
 
     try {
+      if (isEncryptedRelayType(msg.type)) {
+        if (!msg.deviceId) throw new Error('Encrypted message is missing sender ID');
+        msg = {
+          ...msg,
+          payload: await decryptPeerPayload(
+            roomId,
+            msg.type,
+            msg.deviceId,
+            msg.targetId,
+            msg.payload as EncryptedPayloadV1,
+          ),
+        };
+      }
       switch (msg.type) {
         case 'member-list': {
           // Update member list from server
           const members = msg.payload as MemberPayload[];
           for (const m of members) {
             if (m.deviceId !== myDeviceId) {
+              void sendEncryptedSignal(ws.current, roomId, myDeviceId, 'peer-profile', { displayName: getShortName(myDeviceId) }, m.deviceId);
               // Check if member already exists
               const existingMember = store.currentRoom?.members.find(member => member.deviceId === m.deviceId);
 
@@ -740,13 +591,13 @@ export const useWebRTC = () => {
                 store.removePendingJoinRequest(m.deviceId);
                 store.addMember({
                   deviceId: m.deviceId,
-                  displayName: m.displayName,
+                  displayName: m.displayName ?? m.deviceId.slice(0, 8),
                   joinedAt: m.joinedAt,
                   status: 'connecting' as const,
                 });
               } else if (existingMember.status === 'offline') {
                 // Member was offline - retry connection
-                console.log('Retrying connection with offline member', m.displayName);
+                console.log('Retrying connection with offline member');
                 store.updateMemberStatus(m.deviceId, 'connecting');
               }
 
@@ -754,7 +605,7 @@ export const useWebRTC = () => {
               setTimeout(() => {
                 const currentMember = useStore.getState().currentRoom?.members.find(member => member.deviceId === m.deviceId);
                 if (currentMember && currentMember.status === 'connecting') {
-                  console.warn('Connection timeout for', m.displayName, '- marking as offline');
+                  console.warn('Peer connection timeout; marking peer offline');
                   useStore.getState().updateMemberStatus(m.deviceId, 'offline');
                 }
               }, 30000); // 30 seconds timeout
@@ -765,24 +616,19 @@ export const useWebRTC = () => {
                 pc.iceConnectionState === 'closed' || pc.iceConnectionState === 'failed';
 
               if (shouldInitiate && myDeviceId > m.deviceId) {
-                console.log('Initiating connection with member', m.displayName, '(I am initiator)');
+                console.log('Initiating peer connection');
                 try {
                   const newPc = createPeerConnection(m.deviceId, true);
                   const offer = await newPc.createOffer();
                   await newPc.setLocalDescription(offer);
 
-                  ws.current?.send(JSON.stringify({
-                    type: 'offer',
-                    roomId,
-                    targetId: m.deviceId,
-                    payload: offer,
-                  }));
+                  void sendEncryptedSignal(ws.current, roomId, myDeviceId, 'offer', offer, m.deviceId);
                 } catch (err) {
                   console.error('Failed to initiate connection:', err);
                   store.updateMemberStatus(m.deviceId, 'offline');
                 }
               } else if (shouldInitiate) {
-                console.log('Waiting for offer from member', m.displayName, '(they are initiator)');
+                console.log('Waiting for peer offer');
               }
             }
           }
@@ -793,22 +639,23 @@ export const useWebRTC = () => {
         case 'member-joined': {
           const member = msg.payload as MemberPayload;
           if (member.deviceId !== myDeviceId) {
+            void sendEncryptedSignal(ws.current, roomId, myDeviceId, 'peer-profile', { displayName: getShortName(myDeviceId) }, member.deviceId);
             // Check if member already exists
             const existingMember = store.currentRoom?.members.find(m => m.deviceId === member.deviceId);
 
             if (!existingMember) {
               // New member - add to list
-              console.log('Member joined:', member.displayName);
+              console.log('Member joined');
               store.removePendingJoinRequest(member.deviceId);
               store.addMember({
                 deviceId: member.deviceId,
-                displayName: member.displayName,
+                displayName: member.displayName ?? member.deviceId.slice(0, 8),
                 joinedAt: member.joinedAt,
                 status: 'connecting' as const,
               });
             } else if (existingMember.status === 'offline') {
               // Member was offline - retry connection
-              console.log('Retrying connection with offline member', member.displayName);
+              console.log('Retrying connection with offline member');
               store.updateMemberStatus(member.deviceId, 'connecting');
             }
 
@@ -816,7 +663,7 @@ export const useWebRTC = () => {
             setTimeout(() => {
               const currentMember = useStore.getState().currentRoom?.members.find(m => m.deviceId === member.deviceId);
               if (currentMember && currentMember.status === 'connecting') {
-                console.warn('Connection timeout for', member.displayName, '- marking as offline');
+                console.warn('Peer connection timeout; marking peer offline');
                 useStore.getState().updateMemberStatus(member.deviceId, 'offline');
               }
             }, 30000); // 30 seconds timeout
@@ -827,30 +674,25 @@ export const useWebRTC = () => {
               pc.iceConnectionState === 'closed' || pc.iceConnectionState === 'failed';
 
             if (shouldInitiate && myDeviceId > member.deviceId) {
-              console.log('Initiating connection with', member.displayName, '(I am initiator)');
+              console.log('Initiating peer connection');
               try {
                 const newPc = createPeerConnection(member.deviceId, true);
                 const offer = await newPc.createOffer();
                 await newPc.setLocalDescription(offer);
 
-                ws.current?.send(JSON.stringify({
-                  type: 'offer',
-                  roomId,
-                  targetId: member.deviceId,
-                  payload: offer,
-                }));
+                void sendEncryptedSignal(ws.current, roomId, myDeviceId, 'offer', offer, member.deviceId);
               } catch (err) {
                 console.error('Failed to initiate connection:', err);
                 store.updateMemberStatus(member.deviceId, 'offline');
               }
             } else if (shouldInitiate) {
-              console.log('Waiting for offer from', member.displayName, '(they are initiator)');
+              console.log('Waiting for peer offer');
             }
 
             // Send my shared files (outbox) to the new member
             const myFiles = store.currentRoom?.files.filter(f => f.direction === 'outbox') || [];
             if (myFiles.length > 0) {
-              console.log('Sending file list to new member:', member.displayName, `(${myFiles.length} files)`);
+              console.log('Sending encrypted file metadata to new peer');
               myFiles.forEach(file => {
                 const meta: FileMetadataPayload = {
                   id: file.id,
@@ -864,20 +706,27 @@ export const useWebRTC = () => {
                 };
 
                 // Broadcast metadata (receivers will ignore duplicates)
-                ws.current?.send(JSON.stringify({
-                  type: 'file-meta',
-                  roomId: store.currentRoom?.id,
-                  payload: meta,
-                }));
+                if (store.currentRoom?.id && store.deviceId) {
+                  void sendEncryptedSignal(ws.current, store.currentRoom.id, store.deviceId, 'file-meta', meta);
+                }
               });
             }
           }
           break;
         }
 
+        case 'peer-profile': {
+          if (!msg.deviceId) break;
+          const profile = msg.payload as { displayName?: string };
+          if (typeof profile.displayName === 'string' && profile.displayName.length > 0 && profile.displayName.length <= 80) {
+            store.updateMemberProfile(msg.deviceId, profile.displayName);
+          }
+          break;
+        }
+
         case 'member-left': {
           const member = msg.payload as MemberPayload;
-          console.log('Member left:', member.displayName);
+          console.log('Member left');
 
           // Clean up peer connection
           const pc = peers.current.get(member.deviceId);
@@ -899,15 +748,14 @@ export const useWebRTC = () => {
           const pc = createPeerConnection(senderDeviceId, false);
 
           await pc.setRemoteDescription(new RTCSessionDescription(msg.payload as RTCSessionDescriptionInit));
+          for (const candidate of pendingIceCandidates.current.get(senderDeviceId) ?? []) {
+            await pc.addIceCandidate(new RTCIceCandidate(candidate));
+          }
+          pendingIceCandidates.current.delete(senderDeviceId);
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
 
-          ws.current?.send(JSON.stringify({
-            type: 'answer',
-            roomId,
-            targetId: senderDeviceId,
-            payload: answer,
-          }));
+          void sendEncryptedSignal(ws.current, roomId, myDeviceId, 'answer', answer, senderDeviceId);
           break;
         }
 
@@ -918,6 +766,10 @@ export const useWebRTC = () => {
           const pc = peers.current.get(senderDeviceId);
           if (pc) {
             await pc.setRemoteDescription(new RTCSessionDescription(msg.payload as RTCSessionDescriptionInit));
+            for (const candidate of pendingIceCandidates.current.get(senderDeviceId) ?? []) {
+              await pc.addIceCandidate(new RTCIceCandidate(candidate));
+            }
+            pendingIceCandidates.current.delete(senderDeviceId);
           }
           break;
         }
@@ -925,8 +777,13 @@ export const useWebRTC = () => {
         case 'candidate': {
           const senderDeviceId = msg.deviceId!;
           const pc = peers.current.get(senderDeviceId);
-          if (pc && msg.payload) {
+          if (ICE_DIAGNOSTICS) logger.debug('ICE', 'Remote candidate received');
+          if (pc?.remoteDescription && msg.payload) {
             await pc.addIceCandidate(new RTCIceCandidate(msg.payload as RTCIceCandidateInit));
+          } else if (msg.payload) {
+            const pending = pendingIceCandidates.current.get(senderDeviceId) ?? [];
+            pending.push(msg.payload as RTCIceCandidateInit);
+            pendingIceCandidates.current.set(senderDeviceId, pending);
           }
           break;
         }
@@ -945,11 +802,11 @@ export const useWebRTC = () => {
               f.id !== meta.id
             );
             if (duplicate) {
-              logger.debug('Transfer', `Skip duplicate inbox meta for ${meta.name}`, meta.id);
+              logger.debug('Transfer', 'Skipped duplicate encrypted file metadata');
               break;
             }
 
-            console.log('File available:', meta.name, 'from', meta.uploaderName, meta.thumbnailUrl ? '(with thumbnail)' : '');
+            console.log('Encrypted file metadata available');
             store.addFile({
               name: meta.name,
               size: meta.size,
@@ -980,11 +837,9 @@ export const useWebRTC = () => {
               uploadedAt: file.uploadedAt,
               thumbnailUrl: file.thumbnailUrl,
             };
-            ws.current?.send(JSON.stringify({
-              type: 'file-meta',
-              roomId: store.currentRoom?.id,
-              payload: meta,
-            }));
+            if (store.currentRoom?.id && store.deviceId) {
+              void sendEncryptedSignal(ws.current, store.currentRoom.id, store.deviceId, 'file-meta', meta);
+            }
           });
           break;
         }
@@ -1003,7 +858,7 @@ export const useWebRTC = () => {
           if (file) {
             const requester = store.currentRoom?.members.find(m => m.deviceId === requesterId);
             store.addFileDownloader(fileId, requesterId, requester?.displayName ?? requesterId.slice(0, 8));
-            sendFileToOne(file, fileId, requesterId);
+            void sendFileToOneRef.current(file, fileId, requesterId);
           }
           break;
         }
@@ -1019,7 +874,7 @@ export const useWebRTC = () => {
           if (request.deviceId !== myDeviceId) {
             store.addPendingJoinRequest({
               deviceId: request.deviceId,
-              displayName: request.displayName,
+              displayName: request.displayName ?? request.deviceId.slice(0, 8),
               joinedAt: request.joinedAt,
             });
           }
@@ -1075,8 +930,6 @@ export const useWebRTC = () => {
         }
 
         case 'member-removed': {
-          const payload = msg.payload as { removedBy?: string };
-          const removedBy = payload?.removedBy ?? 'another member';
           removedFromRoomRef.current = true;
           if (ws.current) {
             ws.current.onclose = null;
@@ -1087,7 +940,7 @@ export const useWebRTC = () => {
           store.reset();
           const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
           window.location.assign(`${basePath}/app`);
-          logger.warn('General', `Removed from room by ${removedBy}`);
+          logger.warn('General', 'Removed from room by host');
           break;
         }
 
@@ -1106,8 +959,8 @@ export const useWebRTC = () => {
           break;
         }
       }
-    } catch (err) {
-      console.error('Signal handling error:', err);
+    } catch {
+      console.warn('Rejected an invalid or undecryptable signaling message');
     }
   }, [createPeerConnection]);
 
@@ -1145,10 +998,10 @@ export const useWebRTC = () => {
       const roomSettings = useStore.getState().currentRoom?.settings;
       const joinPayload = {
         deviceId,
-        displayName,
         settings: roomSettings ?? undefined,
       };
       ws.current?.send(JSON.stringify({
+        version: PROTOCOL_VERSION,
         type: 'join',
         roomId,
         payload: joinPayload,
@@ -1157,8 +1010,8 @@ export const useWebRTC = () => {
 
     ws.current.onmessage = (event) => {
       try {
-        const msg = JSON.parse(event.data);
-        handleSignalMessage(msg);
+        const msg = parseWireMessage(JSON.parse(event.data));
+        void handleSignalMessage(msg);
       } catch (err) {
         console.error('Failed to parse message:', err);
       }
@@ -1233,13 +1086,9 @@ export const useWebRTC = () => {
       thumbnailUrl,
     };
 
-    ws.current?.send(JSON.stringify({
-      type: 'file-meta',
-      roomId: room.id,
-      payload: meta,
-    }));
+    await sendEncryptedSignal(ws.current, room.id, myDeviceId, 'file-meta', meta);
 
-    console.log('File shared:', file.name, thumbnailUrl ? '(with thumbnail)' : '');
+    console.log('Encrypted file metadata shared');
   }, []);
 
   // Cancel an in-progress download (receiver-initiated)
@@ -1258,7 +1107,9 @@ export const useWebRTC = () => {
     );
 
     if (dc?.readyState === 'open') {
-      dc.send(JSON.stringify({ type: 'file-cancel', fileId }));
+      if (store.currentRoom && store.deviceId) {
+        void sendEncryptedDataControl(dc, store.currentRoom.id, store.deviceId, uploaderId, 'file-cancel', { fileId });
+      }
     }
 
     const writer = fileWriters.current.get(fileId);
@@ -1268,10 +1119,10 @@ export const useWebRTC = () => {
         try {
           // Attempt to abort to discard the incomplete file
           await writer.abort();
-        } catch (err) {
+        } catch {
           try {
             await writer.close();
-          } catch (e) {}
+          } catch {}
         }
       }).catch(() => {});
       fileWriters.current.delete(fileId);
@@ -1298,9 +1149,10 @@ export const useWebRTC = () => {
       return;
     }
 
-    if (mode === 'download' && 'showSaveFilePicker' in window) {
+    const picker = (window as FilePickerWindow).showSaveFilePicker;
+    if (mode === 'download' && picker) {
       try {
-        const handle = await (window as any).showSaveFilePicker({ suggestedName: file.name });
+        const handle = await picker({ suggestedName: file.name });
         const writable = await handle.createWritable();
         fileWriters.current.set(file.id, writable);
       } catch (err) {
@@ -1311,19 +1163,14 @@ export const useWebRTC = () => {
     }
 
     trackTransferAttempt(file.size);
-    console.log('Requesting file:', file.name, 'from', file.uploaderId);
+    console.log('Requesting encrypted file transfer');
     requestModes.current.set(file.id, mode);
 
     // Send request via signaling server
-    ws.current?.send(JSON.stringify({
-      type: 'file-request',
-      roomId: room.id,
-      targetId: file.uploaderId,
-      payload: {
-        fileId: file.id,
-        requesterId: store.deviceId,
-      },
-    }));
+    await sendEncryptedSignal(ws.current, room.id, store.deviceId, 'file-request', {
+      fileId: file.id,
+      requesterId: store.deviceId,
+    }, file.uploaderId);
 
     store.updateFileStatus(file.id, 'downloading');
     store.updateFileProgress(file.id, 0);
@@ -1351,11 +1198,9 @@ export const useWebRTC = () => {
       });
     }
 
-    ws.current?.send(JSON.stringify({
-      type: 'file-meta-sync-request',
-      roomId: room.id,
-      payload: { requesterId: store.deviceId },
-    }));
+    if (store.deviceId) {
+      void sendEncryptedSignal(ws.current, room.id, store.deviceId, 'file-meta-sync-request', { requesterId: store.deviceId });
+    }
   }, []);
 
   const updateRoomSettings = useCallback((settings: RoomSettingsPayload) => {
@@ -1368,6 +1213,7 @@ export const useWebRTC = () => {
       payload.hostToken = room.hostToken;
     }
     ws.current?.send(JSON.stringify({
+      version: PROTOCOL_VERSION,
       type: 'room-settings',
       roomId: room.id,
       payload,
@@ -1381,6 +1227,7 @@ export const useWebRTC = () => {
     if (!room.settings.hostManagement || room.hostDeviceId !== store.deviceId || !room.hostToken) return;
     store.removePendingJoinRequest(deviceId);
     ws.current?.send(JSON.stringify({
+      version: PROTOCOL_VERSION,
       type: 'join-approved',
       roomId: room.id,
       targetId: deviceId,
@@ -1395,6 +1242,7 @@ export const useWebRTC = () => {
     if (!room.settings.hostManagement || room.hostDeviceId !== store.deviceId || !room.hostToken) return;
     store.removePendingJoinRequest(deviceId);
     ws.current?.send(JSON.stringify({
+      version: PROTOCOL_VERSION,
       type: 'join-rejected',
       roomId: room.id,
       targetId: deviceId,
@@ -1409,6 +1257,7 @@ export const useWebRTC = () => {
     if (deviceId === store.deviceId) return;
     if (!room.settings.hostManagement || room.hostDeviceId !== store.deviceId || !room.hostToken) return;
     ws.current?.send(JSON.stringify({
+      version: PROTOCOL_VERSION,
       type: 'member-remove',
       roomId: room.id,
       targetId: deviceId,
@@ -1425,140 +1274,30 @@ export const useWebRTC = () => {
     }
 
     const store = useStore.getState();
-    const abortKey = `${fileId}-${targetDeviceId}`;
-    
-    // Abort any existing transfer to prevent chunk corruption
-    const existingAc = sendAbortControllers.current.get(abortKey);
-    if (existingAc) {
-      existingAc.abort();
-    }
-
-    const ac = new AbortController();
-    sendAbortControllers.current.set(abortKey, ac);
+    const roomId = store.currentRoom?.id;
+    const senderId = store.deviceId;
+    if (!roomId || !senderId) return;
     store.updateFileDownloaderProgress(fileId, targetDeviceId, 0);
-    let completed = false; // true when receiver will send file-progress 100%
-
-    try {
-      // Send start message
-      dc.send(JSON.stringify({
-        type: 'file-start',
-        payload: {
-          id: fileId,
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          uploaderId: store.deviceId,
-          uploaderName: getShortName(store.deviceId!),
-          uploadedAt: Date.now(),
-        },
-      }));
-
-      // Initialize state for Web Worker processing
-      let lastSenderProgress = 0;
-
-      const sendChunkWorker = (): Promise<void> => {
-        return new Promise((resolve, reject) => {
-          const worker = createFileWorker();
-          
-          const terminate = () => {
-            worker.terminate();
-          };
-
-          if (ac.signal.aborted) {
-            terminate();
-            return reject(new Error('Cancelled'));
-          }
-
-          ac.signal.addEventListener('abort', () => {
-            terminate();
-            reject(new Error('Cancelled'));
-          });
-
-          worker.onmessage = (e) => {
-            if (e.data.type === 'transfer-done') {
-              terminate();
-              resolve();
-              return;
-            }
-
-            if (e.data.type === 'chunk-data') {
-              const { chunk, progressOffset, totalBytes } = e.data;
-
-              // Validate channel state before sending
-              if (ac.signal.aborted) {
-                terminate();
-                return reject(new Error('Cancelled'));
-              }
-              if (dc.readyState !== 'open') {
-                terminate();
-                return reject(new Error('DataChannel closed'));
-              }
-
-              // Fire network transmission
-              try {
-                dc.send(chunk);
-              } catch (err) {
-                logger.error('Transfer', `DataChannel send failed: ${err}`);
-                terminate();
-                return reject(err);
-              }
-
-              // Render UI progress asynchronously
-              const senderProgress = Math.min(100, Math.round((progressOffset / totalBytes) * 100));
-              if (senderProgress >= 100 || senderProgress - lastSenderProgress >= 1) {
-                lastSenderProgress = senderProgress;
-                store.updateFileDownloaderProgress(fileId, targetDeviceId, senderProgress);
-              }
-
-              // Process backpressure before requesting the next chunk from the Worker
-              if (dc.bufferedAmount > BUFFER_HIGH_THRESHOLD) {
-                dc.onbufferedamountlow = () => {
-                  dc.onbufferedamountlow = null;
-                  worker.postMessage({ type: 'pull-chunk' });
-                };
-              } else {
-                worker.postMessage({ type: 'pull-chunk' });
-              }
-            }
-          };
-
-          worker.onerror = (err) => {
-            terminate();
-            reject(err);
-          };
-
-          // Ignite the Web Worker I/O pipeline
-          worker.postMessage({
-            type: 'start-transfer',
-            payload: {
-              file,
-              fileId,
-              chunkSize: CHUNK_SIZE,
-              headerSize: FILE_ID_HEADER,
-            }
-          });
-        });
-      };
-
-      await sendChunkWorker();
-
-      // Send end message (receiver will send file-progress 100% when done, then we remove downloader)
-      dc.send(JSON.stringify({ type: 'file-end', fileId }));
-      completed = true;
-      logger.info('Transfer', `File sent`, targetDeviceId);
-
-    } catch (err) {
-      if ((err as Error).message !== 'Cancelled') {
-        logger.error('Transfer', `Send error: ${err}`);
-      }
-    } finally {
-      sendAbortControllers.current.delete(abortKey);
-      // Only remove on error/cancel: on success, receiver will send file-progress 100% and we remove there
-      if (!completed) {
-        useStore.getState().removeFileDownloader(fileId, targetDeviceId);
-      }
+    const completed = await sendEncryptedFile({
+      file,
+      fileId,
+      targetDeviceId,
+      dataChannel: dc,
+      roomId,
+      senderId,
+      abortControllers: sendAbortControllers.current,
+      onProgress: (progress) => {
+        useStore.getState().updateFileDownloaderProgress(fileId, targetDeviceId, progress);
+      },
+    });
+    if (!completed) {
+      useStore.getState().removeFileDownloader(fileId, targetDeviceId);
     }
   }, []);
+
+  useEffect(() => {
+    sendFileToOneRef.current = sendFileToOne;
+  }, [sendFileToOne]);
 
   // ============ Chat ============
 
@@ -1580,16 +1319,12 @@ export const useWebRTC = () => {
     });
 
     // Broadcast to all peers via signaling server
-    ws.current?.send(JSON.stringify({
-      type: 'chat',
-      roomId: room.id,
-      payload: {
-        text,
-        senderId: store.deviceId,
-        senderName: myName,
-        timestamp,
-      },
-    }));
+    void sendEncryptedSignal(ws.current, room.id, store.deviceId, 'chat', {
+      text,
+      senderId: store.deviceId,
+      senderName: myName,
+      timestamp,
+    });
   }, []);
 
   // ============ Effects ============
@@ -1607,7 +1342,7 @@ export const useWebRTC = () => {
 
         // If we are in a room but disconnected (or error), try to reconnect
         if (currentRoom && deviceId && (status === 'disconnected' || status === 'error' || !ws.current || ws.current.readyState === WebSocket.CLOSED)) {
-          console.log('Reconnecting to room:', currentRoom.id);
+          console.log('Reconnecting to secure room');
           connect(currentRoom.id, false);
         }
       }
@@ -1661,12 +1396,9 @@ export const useWebRTC = () => {
         .then((offer) => pc.setLocalDescription(offer))
         .then(() => {
           if (ws.current?.readyState === WebSocket.OPEN) {
-            ws.current.send(JSON.stringify({
-              type: 'offer',
-              roomId: store.currentRoom?.id,
-              targetId: remoteDeviceId,
-              payload: pc.localDescription,
-            }));
+            if (store.currentRoom?.id) {
+              void sendEncryptedSignal(ws.current, store.currentRoom.id, myDeviceId, 'offer', pc.localDescription, remoteDeviceId);
+            }
           }
         })
         .catch((err) => {
@@ -1687,7 +1419,7 @@ export const useWebRTC = () => {
 
     requestFile(file, 'copy');
     return false;
-  }, [copyTextBlobToClipboard, requestFile]);
+  }, [requestFile]);
 
   // ============ Return ============
 

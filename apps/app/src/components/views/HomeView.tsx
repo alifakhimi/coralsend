@@ -25,10 +25,9 @@ import {
 interface HomeViewProps {
   onCreateRoom: () => void;
   onJoinRoom: (roomIdOrUrl: string) => void;
-  onPasteLink: () => Promise<void>;
 }
 
-export function HomeView({ onCreateRoom, onJoinRoom, onPasteLink }: HomeViewProps) {
+export function HomeView({ onCreateRoom, onJoinRoom }: HomeViewProps) {
   const deviceId = useStore((s) => s.deviceId);
   const error = useStore((s) => s.error);
   const pendingShareFiles = useStore((s) => s.pendingShareFiles);
@@ -102,7 +101,7 @@ export function HomeView({ onCreateRoom, onJoinRoom, onPasteLink }: HomeViewProp
               variant="default"
               icon={QrCode}
               title="Join Room"
-              description="Scan QR code, paste link, or enter code"
+              description="Scan QR or paste a complete secure invite"
               href="/app/join"
             />
             <ActionCard

@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { cn, formatFileSize } from '@/lib/utils';
-import { useStore, type Room } from '@/store/store';
+import { cn } from '@/lib/utils';
+import { useStore } from '@/store/store';
 import { Button } from './Button';
 import {
   History,
@@ -142,4 +142,3 @@ export function RoomHistory({ onRejoin, className }: RoomHistoryProps) {
     </div>
   );
 }
-

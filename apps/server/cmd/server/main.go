@@ -24,10 +24,11 @@ type rateLimitState struct {
 }
 
 type fixedWindowLimiter struct {
-	mu      sync.Mutex
-	window  time.Duration
-	maxReq  int
-	clients map[string]*rateLimitState
+	mu          sync.Mutex
+	window      time.Duration
+	maxReq      int
+	clients     map[string]*rateLimitState
+	lastCleanup time.Time
 }
 
 func newFixedWindowLimiter(window time.Duration, maxReq int) *fixedWindowLimiter {
@@ -41,6 +42,14 @@ func newFixedWindowLimiter(window time.Duration, maxReq int) *fixedWindowLimiter
 func (l *fixedWindowLimiter) allow(clientKey string, now time.Time) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	if l.lastCleanup.IsZero() || now.Sub(l.lastCleanup) >= l.window {
+		for key, state := range l.clients {
+			if now.After(state.resetAt) {
+				delete(l.clients, key)
+			}
+		}
+		l.lastCleanup = now
+	}
 
 	state, ok := l.clients[clientKey]
 	if !ok || now.After(state.resetAt) {
@@ -60,24 +69,46 @@ func (l *fixedWindowLimiter) allow(clientKey string, now time.Time) bool {
 }
 
 func getClientIP(r *http.Request) string {
-	if xff := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); xff != "" {
-		parts := strings.Split(xff, ",")
-		if len(parts) > 0 {
-			if ip := strings.TrimSpace(parts[0]); ip != "" {
-				return ip
+	remoteIP := remoteAddressIP(r.RemoteAddr)
+	if trustedProxy(remoteIP) {
+		if xff := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); xff != "" {
+			parts := strings.Split(xff, ",")
+			if len(parts) > 0 {
+				if ip := strings.TrimSpace(parts[0]); ip != "" {
+					if net.ParseIP(ip) != nil {
+						return ip
+					}
+				}
 			}
 		}
-	}
 
-	if xrip := strings.TrimSpace(r.Header.Get("X-Real-IP")); xrip != "" {
-		return xrip
+		if xrip := strings.TrimSpace(r.Header.Get("X-Real-IP")); net.ParseIP(xrip) != nil {
+			return xrip
+		}
 	}
+	return remoteIP
+}
 
-	host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
+func remoteAddressIP(address string) string {
+	host, _, err := net.SplitHostPort(strings.TrimSpace(address))
 	if err == nil && host != "" {
 		return host
 	}
-	return strings.TrimSpace(r.RemoteAddr)
+	return strings.TrimSpace(address)
+}
+
+func trustedProxy(remoteIP string) bool {
+	ip := net.ParseIP(remoteIP)
+	if ip == nil {
+		return false
+	}
+	for _, raw := range strings.Split(os.Getenv("TRUSTED_PROXY_CIDRS"), ",") {
+		_, network, err := net.ParseCIDR(strings.TrimSpace(raw))
+		if err == nil && network.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }
 
 func getEnvInt(key string, fallback int) int {
@@ -124,6 +155,9 @@ func corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 
 func main() {
 	flag.Parse()
+	if err := signal.ValidateRuntimeConfig(); err != nil {
+		log.Fatal(err)
+	}
 	hub := signal.NewHub()
 	go hub.Run()
 

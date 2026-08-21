@@ -225,7 +225,7 @@ export function RoomSettings({
                 End-to-end encrypted
               </p>
               <p className="mt-0.5 text-[var(--text-muted)]">
-                All transfers are encrypted. We never see your files or room code.
+                Room content is application-layer encrypted. Routing metadata remains visible to the signaling service.
               </p>
             </SheetTip>
           </div>

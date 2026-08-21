@@ -17,17 +17,14 @@ const nouns = [
   'Reef', 'Wave', 'Storm', 'Star', 'Moon', 'Sun', 'Cloud', 'Peak'
 ];
 
-const STORAGE_KEY = 'coralsend_device_id';
+const STORAGE_KEY = 'coralsend_device_id_v2';
+const LEGACY_STORAGE_KEY = 'coralsend_device_id';
 
 /**
  * Generate a random human-readable device ID
  */
 export function generateDeviceId(): string {
-  const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
-  const noun = nouns[Math.floor(Math.random() * nouns.length)];
-  const number = Math.floor(Math.random() * 100);
-  
-  return `${adjective}-${noun}-${number.toString().padStart(2, '0')}`;
+  return crypto.randomUUID();
 }
 
 /**
@@ -64,6 +61,14 @@ export function resetDeviceId(): string {
  * e.g., "Blue-Coral-42" -> "Blue-Coral"
  */
 export function getShortName(deviceId: string): string {
+  if (/^[0-9a-f-]{36}$/iu.test(deviceId)) {
+    const legacyName = typeof window !== 'undefined' ? localStorage.getItem(LEGACY_STORAGE_KEY) : null;
+    if (legacyName) return legacyName.split('-').slice(0, 2).join('-');
+    const bytes = new TextEncoder().encode(deviceId);
+    const first = bytes.reduce((sum, byte) => sum + byte, 0) % adjectives.length;
+    const second = bytes.reduce((sum, byte, index) => sum + byte * (index + 1), 0) % nouns.length;
+    return `${adjectives[first]}-${nouns[second]}`;
+  }
   const parts = deviceId.split('-');
   if (parts.length >= 2) {
     return `${parts[0]}-${parts[1]}`;
@@ -97,4 +102,3 @@ export function getAvatarColor(deviceId: string): string {
   const hue = Math.abs(hash % 360);
   return `hsl(${hue}, 70%, 50%)`;
 }
-

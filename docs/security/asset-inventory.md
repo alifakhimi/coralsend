@@ -17,7 +17,7 @@ Define the minimum asset register required to operate CoralSend safely in produc
 | Domains and DNS records | Ops | Registrar + DNS provider | Confidential | Export DNS zone after major changes; enable registrar lock and MFA. |
 | TURN runtime service | Ops | VPS / container runtime | Internal | Keep infrastructure snapshots and deployment manifests. |
 | Signaling runtime service | Ops | VPS / container runtime | Internal | Keep infrastructure snapshots and deployment manifests. |
-| Product analytics config | Product + Engineering | `NEXT_PUBLIC_POSTHOG_*` env vars | Confidential | Store keys in environment secret store; rotate if leaked. |
+| Product analytics config | Product + Engineering | `NEXT_PUBLIC_POSTHOG_*` env vars | Public | Browser configuration is public; restrict provider-side ingestion and origins. |
 | Legal documents | Founder + Legal | Repo docs + public website pages | Public | Versioned in git; review at each policy update. |
 
 ## Owners
@@ -37,7 +37,7 @@ Define the minimum asset register required to operate CoralSend safely in produc
 
 - Recovery baseline:
   - Rebuild deployable images from git tags and CI.
-  - Re-deploy via `deploy/docker-compose.prod.yml`.
+  - Re-deploy via `deploy/docker-compose.yml` and the documented optional overlays.
   - Rotate TURN and analytics credentials after incidents.
   - Restore DNS/TLS from provider controls and backups.
 

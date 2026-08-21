@@ -45,7 +45,10 @@ export class PostHogAdapter implements AnalyticsAdapter {
 
   // PostHog distinct IDs remain pseudonymous technical identifiers only.
   // Application/device identifiers and person properties must never be joined to them.
-  identify(_userId?: string, _properties?: Record<string, unknown>): void {}
+  identify(userId?: string, properties?: Record<string, unknown>): void {
+    void userId;
+    void properties;
+  }
 
   track(event: string, properties?: Record<string, unknown>): void {
     const allowedKeys = ALLOWED_PROPERTIES[event];

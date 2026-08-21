@@ -1,7 +1,7 @@
 'use client';
 
 import { QRCodeSVG } from 'qrcode.react';
-import { MemberList, SheetSection, CopyableField, SheetTip, ShareLinkButtons, Copyable } from '@/components/ui';
+import { MemberList, SheetSection, SheetTip, ShareLinkButtons, Copyable } from '@/components/ui';
 import { Camera, Shield } from 'lucide-react';
 
 export interface ShareRoomSheetProps {
@@ -31,7 +31,6 @@ export interface ShareRoomSheetProps {
 /** Share sheet content: QR, room code, copy link + share, tips, members. Reusable and theme-aware. */
 export function ShareRoomSheet({
   roomCode,
-  roomName,
   shareUrl,
   copiedKey,
   onCopyLink,
@@ -54,7 +53,7 @@ export function ShareRoomSheet({
         <SheetTip variant="warning" icon={<Shield className="h-4 w-4" />}>
           <p>
             <strong>Security tip: </strong>
-            This room code works like an access key—share it only with people you trust.
+            The complete invite link contains the encryption key. Share the link or QR only with people you trust.
           </p>
         </SheetTip>
       </div>

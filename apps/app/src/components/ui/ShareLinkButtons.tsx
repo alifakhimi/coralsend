@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/Button';
-import { Copy, Check, Share2, Link } from 'lucide-react';
+import { Check, Share2, Link } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface ShareLinkButtonsProps {

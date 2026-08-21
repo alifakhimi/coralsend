@@ -1,12 +1,13 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { analytics } from '@/lib/analytics';
 import { ANALYTICS_CONSENT_KEY } from '@/lib/analytics/consent';
 export function AnalyticsConsent() {
-  const [visible, setVisible] = useState(false);
   const configured = Boolean(process.env.NEXT_PUBLIC_GA4_MEASUREMENT_ID?.trim() || process.env.NEXT_PUBLIC_POSTHOG_KEY?.trim());
-  useEffect(() => { if (configured && localStorage.getItem(ANALYTICS_CONSENT_KEY) === null) setVisible(true); }, [configured]);
+  const [visible, setVisible] = useState(
+    () => configured && typeof window !== 'undefined' && localStorage.getItem(ANALYTICS_CONSENT_KEY) === null,
+  );
   if (!visible) return null;
   const choose = (granted: boolean) => { analytics.setConsent(granted); setVisible(false); };
   return <aside className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-xl rounded-xl border border-white/15 bg-slate-950 p-4 text-sm text-slate-100 shadow-2xl" aria-label="Analytics consent">

@@ -28,7 +28,7 @@ function formatTime(ts: number): string {
 
 export function DebugPanel() {
   const [open, setOpen] = useState(false);
-  const [entries, setEntries] = useState<LogEntry[]>([]);
+  const [entries, setEntries] = useState<LogEntry[]>(() => logger.getEntries());
   const [filter, setFilter] = useState<LogCategory | 'all'>('all');
   const scrollRef = useRef<HTMLDivElement>(null);
   const members = useStore((s) => s.currentRoom?.members);
@@ -36,7 +36,6 @@ export function DebugPanel() {
   const setDebugEnabled = useStore((s) => s.setDebugEnabled);
 
   useEffect(() => {
-    setEntries(logger.getEntries());
     return logger.subscribe(() => setEntries(logger.getEntries()));
   }, []);
 

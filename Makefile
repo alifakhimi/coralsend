@@ -1,4 +1,4 @@
-.PHONY: dev server app install test check docker-up docker-coturn-up docker-down docker-restart docker-logs docker-build
+.PHONY: dev server app install test test-server test-app lint typecheck build check e2e verify generate-assets docker-up docker-coturn-up docker-down docker-restart docker-logs docker-build
 
 COMPOSE := docker compose
 COMPOSE_FILE := deploy/docker-compose.yml
@@ -22,20 +22,40 @@ app:
 
 install:
 	@echo "Installing dependencies..."
-	@cd apps/server && go mod tidy
-	@cd apps/app && npm install
+	@cd apps/server && go mod download
+	@cd apps/app && npm ci
 
-test:
-	@echo "Running automated tests..."
+test: test-server test-app
+
+test-server:
+	@echo "Running server tests..."
 	@cd apps/server && go test ./...
 
-check: test
+test-app:
+	@echo "Running app tests..."
+	@cd apps/app && npm test
+
+lint:
 	@echo "Running Go static analysis..."
 	@cd apps/server && go vet ./...
 	@echo "Linting web app..."
 	@cd apps/app && npm run lint
+
+typecheck:
+	@echo "Type-checking web app..."
+	@cd apps/app && npm run typecheck
+
+build:
 	@echo "Building web app..."
 	@cd apps/app && npm run build
+
+check: test lint typecheck build
+
+e2e:
+	@echo "Running browser end-to-end tests..."
+	@cd apps/app && npm run test:e2e
+
+verify: check e2e
 
 generate-assets:
 	@echo "Generate app assets..."
@@ -82,4 +102,3 @@ docker-restart:
 
 docker-logs:
 	@$(COMPOSE) $(COMPOSE_PROJECT) $(ENV_FILE) -f $(COMPOSE_FILE) logs -f --tail=200
-

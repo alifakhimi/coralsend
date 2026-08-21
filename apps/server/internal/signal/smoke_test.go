@@ -16,7 +16,9 @@ func dialTestPeer(t *testing.T, serverURL string) *websocket.Conn {
 	wsURL := "ws" + strings.TrimPrefix(serverURL, "http")
 	conn, response, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if err != nil {
-		if response != nil { t.Fatalf("dial signaling server: %v (status %s)", err, response.Status) }
+		if response != nil {
+			t.Fatalf("dial signaling server: %v (status %s)", err, response.Status)
+		}
 		t.Fatalf("dial signaling server: %v", err)
 	}
 	t.Cleanup(func() { _ = conn.Close() })
@@ -25,18 +27,28 @@ func dialTestPeer(t *testing.T, serverURL string) *websocket.Conn {
 
 func writeJoin(t *testing.T, conn *websocket.Conn, roomID, deviceID string) {
 	t.Helper()
-	payload, err := json.Marshal(JoinPayload{DeviceID: deviceID, DisplayName: deviceID})
-	if err != nil { t.Fatal(err) }
-	if err := conn.WriteJSON(Message{Type: "join", RoomID: roomID, Payload: payload}); err != nil { t.Fatalf("join room: %v", err) }
+	payload, err := json.Marshal(JoinPayload{DeviceID: deviceID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.WriteJSON(Message{Version: ProtocolVersion, Type: "join", RoomID: roomID, Payload: payload}); err != nil {
+		t.Fatalf("join room: %v", err)
+	}
 }
 
 func readUntilType(t *testing.T, conn *websocket.Conn, wanted string) Message {
 	t.Helper()
-	if err := conn.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil { t.Fatal(err) }
+	if err := conn.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
 	for {
 		var message Message
-		if err := conn.ReadJSON(&message); err != nil { t.Fatalf("waiting for %q: %v", wanted, err) }
-		if message.Type == wanted { return message }
+		if err := conn.ReadJSON(&message); err != nil {
+			t.Fatalf("waiting for %q: %v", wanted, err)
+		}
+		if message.Type == wanted {
+			return message
+		}
 	}
 }
 
@@ -50,16 +62,26 @@ func TestSignalingSmoke(t *testing.T) {
 
 	alice := dialTestPeer(t, server.URL)
 	bob := dialTestPeer(t, server.URL)
-	writeJoin(t, alice, "synthetic-room", "alice-test")
+	const aliceID = "00000000-0000-4000-8000-000000000001"
+	const bobID = "00000000-0000-4000-8000-000000000002"
+	writeJoin(t, alice, "ABC234", aliceID)
 	readUntilType(t, alice, "member-list")
-	writeJoin(t, bob, "synthetic-room", "bob-test")
+	writeJoin(t, bob, "ABC234", bobID)
 	joined := readUntilType(t, alice, "member-joined")
-	if joined.DeviceID != "bob-test" { t.Fatalf("member-joined device = %q, want bob-test", joined.DeviceID) }
+	if joined.DeviceID != bobID {
+		t.Fatalf("member-joined device = %q, want %s", joined.DeviceID, bobID)
+	}
 	readUntilType(t, bob, "member-list")
 
-	offerPayload := json.RawMessage(`{"sdp":"synthetic-offer"}`)
-	if err := alice.WriteJSON(Message{Type: "offer", RoomID: "synthetic-room", TargetID: "bob-test", Payload: offerPayload}); err != nil { t.Fatalf("send offer: %v", err) }
+	offerPayload := json.RawMessage(`{"alg":"A256GCM","iv":"AAAAAAAAAAAAAAAA","ciphertext":"AAAAAAAAAAAAAAAAAAAAAA"}`)
+	if err := alice.WriteJSON(Message{Version: ProtocolVersion, Type: "offer", RoomID: "ABC234", TargetID: bobID, Payload: offerPayload}); err != nil {
+		t.Fatalf("send offer: %v", err)
+	}
 	offer := readUntilType(t, bob, "offer")
-	if offer.DeviceID != "alice-test" || offer.TargetID != "bob-test" { t.Fatalf("relayed offer sender/target = %q/%q", offer.DeviceID, offer.TargetID) }
-	if string(offer.Payload) != string(offerPayload) { t.Fatalf("relayed payload = %s, want %s", offer.Payload, offerPayload) }
+	if offer.DeviceID != aliceID || offer.TargetID != bobID {
+		t.Fatalf("relayed offer sender/target = %q/%q", offer.DeviceID, offer.TargetID)
+	}
+	if string(offer.Payload) != string(offerPayload) {
+		t.Fatalf("relayed payload = %s, want %s", offer.Payload, offerPayload)
+	}
 }

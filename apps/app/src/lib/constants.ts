@@ -1,4 +1,4 @@
-import { logger } from "./logger";
+import { buildSecureInviteUrl, getStoredRoomKey } from '@/lib/crypto/secureInvite';
 
 /** Public asset URLs (generated from coralsend-logo.png via npm run generate-assets) */
 export const ASSETS = {
@@ -29,7 +29,9 @@ export const getBaseUrl = (): string => {
 
 /** Full URL to join or share a room. Use for QR codes, copy link, Web Share, etc. */
 export function getRoomShareUrl(roomId: string): string {
-  return `${getBaseUrl()}/room/${roomId}`;
+  const key = getStoredRoomKey(roomId);
+  if (!key) return '';
+  return buildSecureInviteUrl(getBaseUrl(), roomId, key, process.env.NEXT_PUBLIC_BASE_PATH || '');
 }
 
 /** Default title for room share (Web Share API). */
@@ -109,4 +111,3 @@ export const SOCIAL_LINKS = {
   instagram: process.env.NEXT_PUBLIC_INSTAGRAM_URL?.trim() || '',
   linkedin: process.env.NEXT_PUBLIC_LINKEDIN_URL?.trim() || '',
 } as const;
-

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import NextImage from 'next/image';
 import { cn, formatFileSize, formatSpeed, formatEta, getFileIcon } from '@/lib/utils';
 import { useStore, type FileMetadata, type ConnectionPath } from '@/store/store';
 import { getInitials, getAvatarColor } from '@/lib/deviceId';
@@ -12,7 +13,6 @@ import {
   AlertCircle,
   Inbox,
   Send,
-  Filter,
   Clock,
   User,
   FileType,
@@ -30,11 +30,8 @@ import {
   ClipboardPaste,
   Shield,
   Zap,
-  Trash2,
   CheckSquare,
   Square,
-  Share,
-  Share2,
 } from 'lucide-react';
 
 // ============ File Type Categories ============
@@ -64,7 +61,6 @@ interface FileItemProps {
   onDownload?: (file: FileMetadata) => void;
   onCancelDownload?: (fileId: string) => void;
   onCopyTextFile?: (file: FileMetadata) => Promise<boolean>;
-  onDelete?: (fileId: string) => void;
   selecting?: boolean;
   selected?: boolean;
   onToggleSelect?: (fileId: string) => void;
@@ -83,7 +79,6 @@ function FileItem({
   onDownload,
   onCancelDownload,
   onCopyTextFile,
-  onDelete,
   selecting = false,
   selected = false,
   onToggleSelect,
@@ -98,8 +93,6 @@ function FileItem({
   const isError = file.status === 'error';
   const isInbox = file.direction === 'inbox';
   const isOutbox = file.direction === 'outbox';
-  const isImage = file.type.startsWith('image/');
-  const isVideo = file.type.startsWith('video/');
   const isTextFile = file.type.startsWith('text/');
   const [copySuccess, setCopySuccess] = useState(false);
   const progressValue = Math.max(0, Math.min(file.progress ?? 0, 100));
@@ -131,7 +124,7 @@ function FileItem({
           )}
         >
           {thumbnailUrl ? (
-            <img src={thumbnailUrl} alt="" className="w-full h-full object-cover" />
+            <NextImage src={thumbnailUrl} alt="" width={64} height={64} unoptimized className="w-full h-full object-cover" />
           ) : (
             <span className="text-xl min-[480px]:text-2xl">{getFileIcon(file.type)}</span>
           )}
@@ -295,13 +288,12 @@ function FileItem({
 // ============ Filter Dropdown Component ============
 
 interface FilterDropdownProps {
-  label: string;
   value: string;
   options: { id: string; label: string; icon?: React.ComponentType<{ className?: string }> }[];
   onChange: (value: string) => void;
 }
 
-function FilterDropdown({ label, value, options, onChange }: FilterDropdownProps) {
+function FilterDropdown({ value, options, onChange }: FilterDropdownProps) {
   const [open, setOpen] = useState(false);
   const selected = options.find((o) => o.id === value) || options[0];
 
@@ -358,7 +350,6 @@ interface FileListProps {
   selectionMode?: boolean;
   selectedIds?: Set<string>;
   onToggleSelect?: (fileId: string) => void;
-  onDeleteSingle?: (fileId: string) => void;
   className?: string;
   hideHeader?: boolean;
   /** When true, filters row (Pending/Done, Type, Sort) is hidden; code kept for later */
@@ -376,7 +367,6 @@ export function FileList({
   selectionMode = false,
   selectedIds = new Set<string>(),
   onToggleSelect,
-  onDeleteSingle,
   className,
   hideHeader,
   hideFilters,
@@ -455,14 +445,6 @@ export function FileList({
   const isInbox = direction === 'inbox';
   const Icon = isInbox ? Inbox : Send;
   const title = isInbox ? 'Inbox' : 'Outbox';
-  const deleteOne = (fileId: string) => {
-    onDeleteSingle?.(fileId);
-  };
-
-  const emptyMessage = isInbox
-    ? 'No files shared with you yet'
-    : 'Share files by clicking the + button';
-
   return (
     <div className={cn('space-y-3 min-[480px]:space-y-4', className)}>
       {/* Header */}
@@ -502,21 +484,18 @@ export function FileList({
           {/* Type, User, Sort dropdowns - scroll horizontally on narrow screens */}
           <div className="flex items-center gap-2 flex-shrink-0">
             <FilterDropdown
-              label="Type"
               value={typeFilter}
               options={fileTypeCategories.map((c) => ({ id: c.id, label: c.label, icon: c.icon }))}
               onChange={setTypeFilter}
             />
             {uploaders.length > 1 && (
               <FilterDropdown
-                label="From"
                 value={userFilter}
                 options={[{ id: 'all', label: 'All Users', icon: User }, ...uploaders]}
                 onChange={setUserFilter}
               />
             )}
             <FilterDropdown
-              label="Sort"
               value={sortBy}
               options={[
                 { id: 'newest', label: 'Newest', icon: Clock },
@@ -549,7 +528,6 @@ export function FileList({
               onDownload={onDownload}
               onCancelDownload={onCancelDownload}
               onCopyTextFile={onCopyTextFile}
-              onDelete={deleteOne}
               selecting={selectionMode}
               selected={selectedIds.has(file.id)}
               onToggleSelect={onToggleSelect}

@@ -1,11 +1,9 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { useStore } from '@/store/store';
 import { analytics } from '@/lib/analytics';
 import { getDeviceId } from '@/lib/deviceId';
-import { extractRoomId, isValidUUID } from '@/lib/utils';
 
 const SHARE_CACHE_NAME = 'coralsend-share-target';
 
@@ -26,26 +24,6 @@ export function useEnsureDevice() {
     store.setError(null);
     store.setStatus('idle');
   }, [deviceId]);
-}
-
-/**
- * Redirects to /room/[id] if URL has ?room=... with a valid room ID.
- * Use on pages that should handle incoming room links (e.g. /app).
- */
-export function useRoomParamRedirect() {
-  const router = useRouter();
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const params = new URLSearchParams(window.location.search);
-    const roomParam = params.get('room');
-    if (!roomParam) return;
-
-    const roomId = extractRoomId(roomParam) || roomParam.toUpperCase();
-    if (/^[A-Z0-9]{6}$/.test(roomId) || isValidUUID(roomId)) {
-      router.replace(`/room/${roomId}`);
-    }
-  }, [router]);
 }
 
 /**
@@ -87,10 +65,9 @@ export function useShareTarget() {
 }
 
 /**
- * Combined init for the main app page: device, room param redirect, share target.
+ * Combined init for the main app page: device and share target.
  */
 export function useAppInit() {
   useEnsureDevice();
-  useRoomParamRedirect();
   useShareTarget();
 }

@@ -60,7 +60,7 @@ Every `NEXT_PUBLIC_*` variable is compiled into browser assets and is public, in
 Important server variables:
 
 - `APP_ENV=production` enables strict startup validation.
-- `ALLOWED_ORIGINS` is required in production and contains exact HTTP(S) origins.
+- `ALLOWED_ORIGINS` is required in production. It accepts exact HTTP(S) origins and one-level subdomain patterns such as `https://*.example.com`; `*` allows every valid HTTP(S) origin and emits a startup warning, so prefer an explicit list or restricted wildcard.
 - `HOST_SECRET` is required in production and must be at least 32 bytes.
 - `TRUSTED_PROXY_CIDRS` lists proxies allowed to supply forwarded client-IP headers; leave empty when no trusted proxy is present.
 - `RATE_LIMIT_WINDOW` and `RATE_LIMIT_MAX_REQUESTS` control WebSocket handshake throttling.

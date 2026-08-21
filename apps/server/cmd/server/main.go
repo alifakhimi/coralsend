@@ -158,6 +158,9 @@ func main() {
 	if err := signal.ValidateRuntimeConfig(); err != nil {
 		log.Fatal(err)
 	}
+	if signal.UsesGlobalOriginWildcard() {
+		log.Println("WARNING: ALLOWED_ORIGINS=* allows every valid HTTP(S) browser origin; prefer an explicit origin or restricted subdomain wildcard in production")
+	}
 	hub := signal.NewHub()
 	go hub.Run()
 

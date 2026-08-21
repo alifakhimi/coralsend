@@ -15,7 +15,7 @@ export default function PrivacyPage() {
       <div className="relative z-10 max-w-3xl mx-auto px-4 py-10 space-y-6">
         <h1 className="text-2xl font-bold text-[var(--text-primary)]">Privacy Policy</h1>
         <p className="text-[var(--text-muted)] text-sm">
-          Last updated: 2026-02-20
+          Last updated: 2026-08-13
         </p>
 
         <section className="space-y-2 text-sm text-[var(--text-primary)]">
@@ -31,7 +31,7 @@ export default function PrivacyPage() {
           <ul className="list-disc pl-5 space-y-1">
             <li>Room and connection metadata required to establish peer sessions.</li>
             <li>Device identifier stored in browser local storage for session continuity.</li>
-            <li>Optional analytics events if PostHog is configured by the operator.</li>
+            <li>Optional aggregate analytics events after consent if GA4 or PostHog is configured by the operator. CoralSend does not intentionally include file names, room or transfer IDs, recipient identifiers, email addresses, or event properties in GA4.</li>
           </ul>
         </section>
 

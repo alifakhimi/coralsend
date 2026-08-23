@@ -84,6 +84,44 @@ test('two contexts join securely, exchange encrypted chat, and transfer an encry
   await joinerContext.close();
 });
 
+test('files shared by a peer disappear when that peer reloads and loses the source', async ({ browser }) => {
+  const permissions = ['clipboard-read', 'clipboard-write'];
+  const creatorContext = await browser.newContext({ permissions });
+  const sharerContext = await browser.newContext({ permissions });
+  const creator = await creatorContext.newPage();
+  const sharer = await sharerContext.newPage();
+
+  await creator.goto('/app');
+  await creator.getByText('Create Room', { exact: true }).click();
+  await expect(creator.getByRole('heading', { name: /^Room /u })).toBeVisible();
+  await creator.getByRole('button', { name: 'Share room' }).click();
+  await creator.getByRole('button', { name: /Copy link/u }).click();
+  const invite = await creator.evaluate(() => navigator.clipboard.readText());
+
+  await sharer.goto(invite);
+  await expect(sharer.getByText('2 members', { exact: true })).toBeVisible();
+  await expect(creator.getByText('2 members', { exact: true })).toBeVisible();
+  await creator.keyboard.press('Escape');
+
+  await sharer.getByRole('button', { name: /Outbox/u }).click();
+  await sharer.locator('input[type="file"]').setInputFiles({
+    name: 'reload-source.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('this source exists only before the sharing page reloads'),
+  });
+  await creator.getByRole('button', { name: /Inbox/u }).click();
+  await expect(creator.getByText('reload-source.txt', { exact: true })).toBeVisible();
+
+  await sharer.reload();
+  await expect(sharer.getByRole('heading', { name: /^Room /u })).toBeVisible();
+  await expect(creator.getByText('reload-source.txt', { exact: true })).toHaveCount(0);
+  await sharer.getByRole('button', { name: /Outbox/u }).click();
+  await expect(sharer.getByText('reload-source.txt', { exact: true })).toHaveCount(0);
+
+  await creatorContext.close();
+  await sharerContext.close();
+});
+
 test('a locator without the fragment key cannot join and protocol v0 is rejected', async ({ page }) => {
   await page.goto('/room/ABC234');
   await expect(page).toHaveURL(/\/app$/u);

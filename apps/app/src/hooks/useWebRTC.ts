@@ -553,6 +553,68 @@ export const useWebRTC = () => {
     return pc;
   }, [setupDataChannel, cleanupPeerConnection]);
 
+  const broadcastAvailableOutboxMetadata = useCallback(() => {
+    const store = useStore.getState();
+    const room = store.currentRoom;
+    const deviceId = store.deviceId;
+    if (!room || !deviceId) return;
+
+    const outboxFiles = room.files.filter((file) => file.direction === 'outbox' && !file.trashed);
+    const unavailableIds = outboxFiles
+      .filter((file) => !pendingFiles.current.has(file.id))
+      .map((file) => file.id);
+
+    // Metadata without its in-memory File source must not remain advertised.
+    if (unavailableIds.length > 0) store.purgeFiles(unavailableIds);
+
+    const availableFiles = outboxFiles.filter((file) => pendingFiles.current.has(file.id));
+    if (availableFiles.length > 0) {
+      console.log('Sending encrypted file metadata to peers');
+    }
+    availableFiles.forEach((file) => {
+      const meta: FileMetadataPayload = {
+        id: file.id,
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        uploaderId: deviceId,
+        uploaderName: getShortName(deviceId),
+        uploadedAt: file.uploadedAt,
+        thumbnailUrl: file.thumbnailUrl,
+      };
+      void sendEncryptedSignal(ws.current, room.id, deviceId, 'file-meta', meta);
+    });
+  }, []);
+
+  const purgeInboxFilesFromUploader = useCallback((uploaderId: string) => {
+    const store = useStore.getState();
+    const fileIds = store.currentRoom?.files
+      .filter((file) => file.direction === 'inbox' && file.uploaderId === uploaderId)
+      .map((file) => file.id) ?? [];
+    if (fileIds.length === 0) return;
+
+    const ids = new Set(fileIds);
+    store.purgeFiles(fileIds);
+    incomingTransfers.current.forEach((fileId, transferId) => {
+      if (ids.has(fileId)) incomingTransfers.current.delete(transferId);
+    });
+    fileIds.forEach((fileId) => {
+      incomingChunks.current.delete(fileId);
+      earlyChunks.current.delete(fileId);
+      requestModes.current.delete(fileId);
+      receivedFileBlobs.current.delete(fileId);
+      lastProgressReported.current.delete(fileId);
+
+      const writer = fileWriters.current.get(fileId);
+      if (writer) {
+        const queuedWrites = writeQueues.current.get(fileId) ?? Promise.resolve();
+        void queuedWrites.then(() => writer.abort()).catch(() => {});
+        fileWriters.current.delete(fileId);
+        writeQueues.current.delete(fileId);
+      }
+    });
+  }, []);
+
   // ============ Signaling ============
 
   const handleSignalMessage = useCallback(async (msg: SignalMessage) => {
@@ -632,6 +694,9 @@ export const useWebRTC = () => {
               }
             }
           }
+          // A live reconnect keeps File objects in memory and republishes them.
+          // A hard reload has no sources, so stale Outbox metadata is removed.
+          broadcastAvailableOutboxMetadata();
           store.setStatus('connected');
           break;
         }
@@ -689,28 +754,8 @@ export const useWebRTC = () => {
               console.log('Waiting for peer offer');
             }
 
-            // Send my shared files (outbox) to the new member
-            const myFiles = store.currentRoom?.files.filter(f => f.direction === 'outbox') || [];
-            if (myFiles.length > 0) {
-              console.log('Sending encrypted file metadata to new peer');
-              myFiles.forEach(file => {
-                const meta: FileMetadataPayload = {
-                  id: file.id,
-                  name: file.name,
-                  size: file.size,
-                  type: file.type,
-                  uploaderId: store.deviceId!,
-                  uploaderName: getShortName(store.deviceId!),
-                  uploadedAt: file.uploadedAt,
-                  thumbnailUrl: file.thumbnailUrl,
-                };
-
-                // Broadcast metadata (receivers will ignore duplicates)
-                if (store.currentRoom?.id && store.deviceId) {
-                  void sendEncryptedSignal(ws.current, store.currentRoom.id, store.deviceId, 'file-meta', meta);
-                }
-              });
-            }
+            // Send only files that still have a live source in this page.
+            broadcastAvailableOutboxMetadata();
           }
           break;
         }
@@ -736,6 +781,9 @@ export const useWebRTC = () => {
           }
           dataChannels.current.delete(member.deviceId);
 
+          // File bytes live only in the uploader's page. Once that member leaves,
+          // their Inbox entries are no longer valid download targets.
+          purgeInboxFilesFromUploader(member.deviceId);
           store.removeMember(member.deviceId);
           break;
         }
@@ -823,24 +871,7 @@ export const useWebRTC = () => {
 
         case 'file-meta-sync-request': {
           // Another peer asks us to resend current outbox metadata
-          const myFiles = store.currentRoom?.files.filter(
-            (f) => f.direction === 'outbox' && !f.trashed
-          ) || [];
-          myFiles.forEach((file) => {
-            const meta: FileMetadataPayload = {
-              id: file.id,
-              name: file.name,
-              size: file.size,
-              type: file.type,
-              uploaderId: store.deviceId!,
-              uploaderName: getShortName(store.deviceId!),
-              uploadedAt: file.uploadedAt,
-              thumbnailUrl: file.thumbnailUrl,
-            };
-            if (store.currentRoom?.id && store.deviceId) {
-              void sendEncryptedSignal(ws.current, store.currentRoom.id, store.deviceId, 'file-meta', meta);
-            }
-          });
+          broadcastAvailableOutboxMetadata();
           break;
         }
 
@@ -962,7 +993,7 @@ export const useWebRTC = () => {
     } catch {
       console.warn('Rejected an invalid or undecryptable signaling message');
     }
-  }, [createPeerConnection]);
+  }, [broadcastAvailableOutboxMetadata, createPeerConnection, purgeInboxFilesFromUploader]);
 
   // ============ Connection ============
 

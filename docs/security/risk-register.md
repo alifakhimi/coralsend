@@ -2,7 +2,7 @@
 
 | ID | Risk | Severity | Mitigation / evidence | Status |
 | --- | --- | --- | --- | --- |
-| R-001 | Cross-origin signaling abuse | High | Exact production `ALLOWED_ORIGINS`, fail-fast config, WS/HTTP checks | Mitigated; monitor |
+| R-001 | Cross-origin signaling abuse | High | Production `ALLOWED_ORIGINS` supports exact and restricted one-level wildcard rules; global `*` is explicitly warned and covered by WS/HTTP tests | Mitigated for restricted rules; global wildcard remains high risk |
 | R-002 | Proxy spoofing and unbounded limiter state | High | `TRUSTED_PROXY_CIDRS`, ignored forwarded headers otherwise, deterministic stale-key eviction | Mitigated; monitor |
 | R-003 | Plaintext signaling or downgrade | Critical | Protocol v1 envelopes, first-message join, typed rejection and close 1008, no v0 fallback | Mitigated by tests |
 | R-004 | AES-GCM nonce/counter reuse or transfer corruption | Critical | Random room IVs, bounded replay cache, per-recipient transfer keys, counter frames, final totals | Needs independent review |

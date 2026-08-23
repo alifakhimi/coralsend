@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -37,5 +38,45 @@ func TestClientIPOnlyTrustsConfiguredProxy(t *testing.T) {
 	trusted.Header.Set("X-Forwarded-For", "198.51.100.7, 10.1.2.3")
 	if got := getClientIP(trusted); got != "198.51.100.7" {
 		t.Fatalf("trusted proxy IP = %q", got)
+	}
+}
+
+func TestCORSMiddlewareEchoesAllowedWildcardOrigin(t *testing.T) {
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("ALLOWED_ORIGINS", "*")
+	handler := http.HandlerFunc(corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	request := httptest.NewRequest(http.MethodOptions, "http://server.test/health", nil)
+	request.Header.Set("Origin", "https://one.example.test")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("CORS response status = %d", response.Code)
+	}
+	if got := response.Header().Get("Access-Control-Allow-Origin"); got != "https://one.example.test" {
+		t.Fatalf("Access-Control-Allow-Origin = %q", got)
+	}
+	if got := response.Header().Get("Vary"); got != "Origin" {
+		t.Fatalf("Vary = %q", got)
+	}
+}
+
+func TestCORSMiddlewareRejectsUnmatchedWildcardOrigin(t *testing.T) {
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("ALLOWED_ORIGINS", "https://*.example.test")
+	handler := http.HandlerFunc(corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	request := httptest.NewRequest(http.MethodGet, "http://server.test/health", nil)
+	request.Header.Set("Origin", "https://one.two.example.test")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusForbidden {
+		t.Fatalf("unmatched origin response status = %d", response.Code)
 	}
 }

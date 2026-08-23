@@ -94,3 +94,86 @@ func TestProductionOriginPolicy(t *testing.T) {
 		t.Fatal("unconfigured production origin accepted")
 	}
 }
+
+func TestOriginPolicyPatterns(t *testing.T) {
+	t.Setenv("APP_ENV", "production")
+	tests := []struct {
+		name      string
+		allowlist string
+		origin    string
+		want      bool
+	}{
+		{name: "exact", allowlist: "https://app.example.test", origin: "https://app.example.test", want: true},
+		{name: "exact mismatch", allowlist: "https://app.example.test", origin: "https://other.example.test", want: false},
+		{name: "global wildcard", allowlist: "*", origin: "http://anywhere.test:8080", want: true},
+		{name: "global wildcard rejects null", allowlist: "*", origin: "null", want: false},
+		{name: "global wildcard rejects non-http", allowlist: "*", origin: "ftp://files.example.test", want: false},
+		{name: "subdomain wildcard", allowlist: "https://*.example.test", origin: "https://one.example.test", want: true},
+		{name: "subdomain wildcard rejects base", allowlist: "https://*.example.test", origin: "https://example.test", want: false},
+		{name: "subdomain wildcard rejects multiple levels", allowlist: "https://*.example.test", origin: "https://one.two.example.test", want: false},
+		{name: "subdomain wildcard scheme mismatch", allowlist: "https://*.example.test", origin: "http://one.example.test", want: false},
+		{name: "subdomain wildcard port match", allowlist: "https://*.example.test:8443", origin: "https://one.example.test:8443", want: true},
+		{name: "subdomain wildcard port mismatch", allowlist: "https://*.example.test:8443", origin: "https://one.example.test", want: false},
+		{name: "path rejected", allowlist: "https://*.example.test/path", origin: "https://one.example.test", want: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv("ALLOWED_ORIGINS", test.allowlist)
+			if got := IsOriginAllowed(test.origin); got != test.want {
+				t.Fatalf("IsOriginAllowed(%q) with %q = %v, want %v", test.origin, test.allowlist, got, test.want)
+			}
+		})
+	}
+}
+
+func TestOriginPolicyPreservesDevelopmentFallback(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
+	t.Setenv("ALLOWED_ORIGINS", "")
+	if !IsOriginAllowed("not-an-origin") {
+		t.Fatal("empty development allowlist no longer permits the existing fallback")
+	}
+}
+
+func TestOriginPolicyValidation(t *testing.T) {
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("HOST_SECRET", "0123456789abcdef0123456789abcdef")
+	for _, allowlist := range []string{
+		"*",
+		"https://*.example.test",
+		"https://app.example.test,https://*.example.test:8443",
+	} {
+		t.Run(allowlist, func(t *testing.T) {
+			t.Setenv("ALLOWED_ORIGINS", allowlist)
+			if err := ValidateRuntimeConfig(); err != nil {
+				t.Fatalf("valid origin policy rejected: %v", err)
+			}
+		})
+	}
+
+	for _, allowlist := range []string{
+		"https://*example.test",
+		"https://*.example.test/path",
+		"https://*.example.test:bad",
+		"https://foo.*.example.test",
+		"null",
+	} {
+		t.Run("invalid-"+allowlist, func(t *testing.T) {
+			t.Setenv("ALLOWED_ORIGINS", allowlist)
+			if err := ValidateRuntimeConfig(); err == nil {
+				t.Fatalf("invalid origin policy %q was accepted", allowlist)
+			}
+		})
+	}
+}
+
+func TestGlobalOriginWildcardDetection(t *testing.T) {
+	t.Setenv("ALLOWED_ORIGINS", "https://app.example.test, *")
+	if !UsesGlobalOriginWildcard() {
+		t.Fatal("global wildcard was not detected")
+	}
+	t.Setenv("ALLOWED_ORIGINS", "https://*.example.test")
+	if UsesGlobalOriginWildcard() {
+		t.Fatal("restricted wildcard was reported as global")
+	}
+}

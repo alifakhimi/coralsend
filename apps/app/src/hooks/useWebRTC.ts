@@ -586,10 +586,10 @@ export const useWebRTC = () => {
     });
   }, []);
 
-  const purgeInboxFilesFromUploader = useCallback((uploaderId: string) => {
+  const purgeInboxFiles = useCallback((uploaderId?: string) => {
     const store = useStore.getState();
     const fileIds = store.currentRoom?.files
-      .filter((file) => file.direction === 'inbox' && file.uploaderId === uploaderId)
+      .filter((file) => file.direction === 'inbox' && (!uploaderId || file.uploaderId === uploaderId))
       .map((file) => file.id) ?? [];
     if (fileIds.length === 0) return;
 
@@ -783,7 +783,7 @@ export const useWebRTC = () => {
 
           // File bytes live only in the uploader's page. Once that member leaves,
           // their Inbox entries are no longer valid download targets.
-          purgeInboxFilesFromUploader(member.deviceId);
+          purgeInboxFiles(member.deviceId);
           store.removeMember(member.deviceId);
           break;
         }
@@ -955,6 +955,9 @@ export const useWebRTC = () => {
         case 'room-expired': {
           const payload = msg.payload as { reason?: string };
           const reason = payload?.reason ?? 'expired';
+          // A host departure closes every connection without emitting member-left.
+          // Drop remote metadata immediately; live peers will republish after reconnect.
+          purgeInboxFiles();
           store.setStatus('error');
           store.setError(reason === 'host_left' ? 'Host left the room' : 'Room expired due to inactivity');
           break;
@@ -993,7 +996,7 @@ export const useWebRTC = () => {
     } catch {
       console.warn('Rejected an invalid or undecryptable signaling message');
     }
-  }, [broadcastAvailableOutboxMetadata, createPeerConnection, purgeInboxFilesFromUploader]);
+  }, [broadcastAvailableOutboxMetadata, createPeerConnection, purgeInboxFiles]);
 
   // ============ Connection ============
 

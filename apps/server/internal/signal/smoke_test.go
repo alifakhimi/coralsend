@@ -85,3 +85,34 @@ func TestSignalingSmoke(t *testing.T) {
 		t.Fatalf("relayed payload = %s, want %s", offer.Payload, offerPayload)
 	}
 }
+
+func TestHostDepartureDeliversRoomExpiredBeforeClosingPeers(t *testing.T) {
+	hub := NewHub()
+	go hub.Run()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { ServeWs(hub, w, r) }))
+	t.Cleanup(server.Close)
+
+	host := dialTestPeer(t, server.URL)
+	peer := dialTestPeer(t, server.URL)
+	const hostID = "00000000-0000-4000-8000-000000000001"
+	const peerID = "00000000-0000-4000-8000-000000000002"
+	writeJoin(t, host, "ABC234", hostID)
+	readUntilType(t, host, "member-list")
+	writeJoin(t, peer, "ABC234", peerID)
+	readUntilType(t, host, "member-joined")
+	readUntilType(t, peer, "member-list")
+
+	if err := host.Close(); err != nil {
+		t.Fatalf("close host connection: %v", err)
+	}
+	expired := readUntilType(t, peer, "room-expired")
+	var payload struct {
+		Reason string `json:"reason"`
+	}
+	if err := json.Unmarshal(expired.Payload, &payload); err != nil {
+		t.Fatalf("decode room-expired payload: %v", err)
+	}
+	if payload.Reason != "host_left" {
+		t.Fatalf("room-expired reason = %q, want host_left", payload.Reason)
+	}
+}

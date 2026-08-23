@@ -122,6 +122,41 @@ test('files shared by a peer disappear when that peer reloads and loses the sour
   await sharerContext.close();
 });
 
+test('files shared by the room host disappear for peers when the host reloads', async ({ browser }) => {
+  const permissions = ['clipboard-read', 'clipboard-write'];
+  const hostContext = await browser.newContext({ permissions });
+  const peerContext = await browser.newContext({ permissions });
+  const host = await hostContext.newPage();
+  const peer = await peerContext.newPage();
+
+  await host.goto('/app');
+  await host.getByText('Create Room', { exact: true }).click();
+  await expect(host.getByRole('heading', { name: /^Room /u })).toBeVisible();
+  await host.getByRole('button', { name: 'Share room' }).click();
+  await host.getByRole('button', { name: /Copy link/u }).click();
+  const invite = await host.evaluate(() => navigator.clipboard.readText());
+
+  await peer.goto(invite);
+  await expect(peer.getByText('2 members', { exact: true })).toBeVisible();
+  await expect(host.getByText('2 members', { exact: true })).toBeVisible();
+  await host.keyboard.press('Escape');
+
+  await host.getByRole('button', { name: /Outbox/u }).click();
+  await host.locator('input[type="file"]').setInputFiles({
+    name: 'host-reload-source.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('the host source is lost when the page reloads'),
+  });
+  await expect(peer.getByText('host-reload-source.txt', { exact: true })).toBeVisible();
+
+  await host.reload();
+  await expect(host.getByRole('heading', { name: /^Room /u })).toBeVisible();
+  await expect(peer.getByText('host-reload-source.txt', { exact: true })).toHaveCount(0);
+
+  await hostContext.close();
+  await peerContext.close();
+});
+
 test('a locator without the fragment key cannot join and protocol v0 is rejected', async ({ page }) => {
   await page.goto('/room/ABC234');
   await expect(page).toHaveURL(/\/app$/u);

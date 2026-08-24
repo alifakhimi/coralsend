@@ -136,8 +136,8 @@ func (h *Hub) closeRoomLocked(roomID string, reason string) {
 			case client.send <- msg:
 			default:
 			}
+			// Let writePump flush the terminal message before it closes the socket.
 			close(client.send)
-			_ = client.conn.Close()
 		}
 	}
 	if pending, ok := h.pendingJoins[roomID]; ok {
@@ -153,8 +153,8 @@ func (h *Hub) closeRoomLocked(roomID string, reason string) {
 			case pendingClient.send <- msg:
 			default:
 			}
+			// Let writePump flush the terminal message before it closes the socket.
 			close(pendingClient.send)
-			_ = pendingClient.conn.Close()
 		}
 	}
 	delete(h.rooms, roomID)
